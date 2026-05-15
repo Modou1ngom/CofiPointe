@@ -1,0 +1,375 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
+import '../../../../providers/attendance_ui_provider.dart';
+import '../../../../providers/dashboard_summary_provider.dart';
+import '../../../../providers/pointage_mobile_providers.dart';
+import '../../../../services/session_controller.dart';
+import '../../../../widgets/cards/glass_card.dart';
+import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
+
+class DashboardScreen extends ConsumerWidget {
+  const DashboardScreen({super.key});
+
+  static const routePath = '/home';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionControllerProvider);
+    final todayAsync = ref.watch(pointageTodayProvider);
+    final local = ref.watch(todayAttendanceUiProvider);
+    final api = todayAsync.valueOrNull;
+    final checkIn = local.checkIn ?? api?.checkIn;
+    final checkOut = local.checkOut ?? api?.checkOut;
+    final summary = ref.watch(dashboardSummaryProvider);
+    final name = session.user?.fullName ?? 'Collaborateur';
+    final timeFmt = DateFormat('hh:mm a', 'en_US');
+    final scheme = Theme.of(context).colorScheme;
+
+    final present = checkIn != null;
+    final entry = checkIn;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              foregroundColor: AppColors.primary,
+              child: Text(
+                name.trim().isEmpty ? '?' : _dashboardInitial(name),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bonjour, $name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                  ),
+                  Text(
+                    'Tableau de bord',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser',
+            onPressed: () {
+              ref.invalidate(pointageTodayProvider);
+            },
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          IconButton(
+            onPressed: () => context.go(NotificationsScreen.routePath),
+            icon: const Icon(Icons.notifications_none_rounded),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.xl,
+        ),
+        children: [
+          GlassCard(
+            child: Row(
+              children: [
+                Icon(
+                  present ? Icons.verified_rounded : Icons.schedule_rounded,
+                  color: present ? AppColors.success : AppColors.primary,
+                  size: 36,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STATUT AUJOURD’HUI',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              letterSpacing: 0.9,
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        present ? 'Présent' : 'En attente de pointage',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                        ),
+                      ),
+                      if (entry != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Entrée : ${timeFmt.format(entry)}',
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: AppSpacing.md),
+          Material(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            clipBehavior: Clip.antiAlias,
+            elevation: 2,
+            shadowColor: AppColors.primary.withValues(alpha: 0.45),
+            child: InkWell(
+              onTap: () => context.push(QrScannerScreen.routePath),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.lg + 4,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.qr_code_scanner_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Scanner QR Code',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Pointez votre entrée ou votre sortie en toute sécurité.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+                  ],
+                ),
+              ),
+            ),
+          ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.04),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Résumé aujourd’hui',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.charcoal,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Présents',
+                  value: '${summary.presentsCount}',
+                  accent: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Retards',
+                  value: '${summary.lateCount}',
+                  accent: AppColors.warning,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Absents',
+                  value: '${summary.absentCount}',
+                  accent: AppColors.charcoal,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Congés',
+                  value: '${summary.onLeaveCount}',
+                  accent: scheme.primary,
+                ),
+              ),
+            ],
+          ).animate().fadeIn(delay: 120.ms),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Mes horaires',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.charcoal,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  _timeColumn(
+                    context,
+                    label: 'Entrée',
+                    value: entry != null ? timeFmt.format(entry) : '--:--',
+                    accent: AppColors.success,
+                  ),
+                  const SizedBox(width: AppSpacing.lg),
+                  _timeColumn(
+                    context,
+                    label: 'Sortie',
+                    value: checkOut != null ? timeFmt.format(checkOut) : '--:--',
+                    accent: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (todayAsync.hasError)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text(
+                'Pointage du jour : impossible de synchroniser (réessayez).',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.error,
+                    ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeColumn(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required Color accent,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _dashboardInitial(String name) {
+  final t = name.trim();
+  if (t.isEmpty) return '?';
+  return String.fromCharCode(t.runes.first).toUpperCase();
+}
+
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: accent,
+                height: 1.1,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.1,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

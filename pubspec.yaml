@@ -1,0 +1,52 @@
+name: cofi_pointe
+description: CofiPointe — Pointage biométrique entreprise (Clean Architecture).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.6.2
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.2
+  local_auth: ^2.3.0
+  mobile_scanner: ^6.0.2
+  geolocator: ^13.0.2
+  firebase_core: ^3.8.1
+  firebase_messaging: ^15.1.5
+  uuid: ^4.5.1
+  intl: ^0.20.2
+  connectivity_plus: ^6.1.1
+  crypto: ^3.0.6
+  flutter_animate: ^4.5.2
+  shimmer: ^3.0.0
+  equatable: ^2.0.7
+  device_info_plus: ^11.2.0
+  package_info_plus: ^8.1.2
+  shared_preferences: ^2.3.3
+  encrypt: ^5.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "web/icons/logo1.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "web/icons/logo1.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

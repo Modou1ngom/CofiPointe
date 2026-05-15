@@ -1,0 +1,40 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app.dart';
+import 'providers/app_providers.dart';
+import 'services/push_notification_service.dart';
+import 'services/session_controller.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    final push = PushNotificationService();
+    await push.init();
+  } catch (_) {
+    // Firebase non configuré — ajoutez `flutterfire configure` pour activer FCM.
+  }
+
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+    ],
+  );
+
+  await container.read(sessionControllerProvider.notifier).hydrate();
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const CofiPointeApp(),
+    ),
+  );
+}
