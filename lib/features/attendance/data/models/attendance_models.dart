@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/utils/app_date_format.dart';
+import '../../../../models/office_zone.dart';
+
 class AttendanceRecord extends Equatable {
   const AttendanceRecord({
     required this.id,
@@ -16,11 +19,7 @@ class AttendanceRecord extends Equatable {
   final String status;
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDt(dynamic v) {
-      if (v == null) return null;
-      if (v is String) return DateTime.tryParse(v);
-      return null;
-    }
+    DateTime? parseDt(dynamic v) => AppDateFormat.parseApi(v);
 
     return AttendanceRecord(
       id: json['id']?.toString() ?? '',
@@ -33,6 +32,53 @@ class AttendanceRecord extends Equatable {
 
   @override
   List<Object?> get props => [id, date, checkIn, checkOut, status];
+}
+
+class AttendanceScanRequest extends Equatable {
+  const AttendanceScanRequest({
+    required this.qrPayload,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String qrPayload;
+  final double latitude;
+  final double longitude;
+
+  Map<String, dynamic> toJson() => {
+        'qr_payload': qrPayload,
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+
+  @override
+  List<Object?> get props => [qrPayload, latitude, longitude];
+}
+
+class AttendanceScanResponse extends Equatable {
+  const AttendanceScanResponse({
+    required this.valid,
+    this.message,
+    this.officeZone,
+  });
+
+  final bool valid;
+  final String? message;
+  final OfficeZone? officeZone;
+
+  factory AttendanceScanResponse.fromJson(Map<String, dynamic> json) {
+    final zoneRaw = json['office_zone'] ?? json['officeZone'];
+    return AttendanceScanResponse(
+      valid: json['valid'] == true,
+      message: json['message']?.toString(),
+      officeZone: zoneRaw is Map
+          ? OfficeZone.fromJson(Map<String, dynamic>.from(zoneRaw))
+          : null,
+    );
+  }
+
+  @override
+  List<Object?> get props => [valid, message, officeZone];
 }
 
 class AttendanceSubmitRequest extends Equatable {
@@ -80,10 +126,8 @@ class AttendanceSubmitResponse extends Equatable {
   factory AttendanceSubmitResponse.fromJson(Map<String, dynamic> json) {
     return AttendanceSubmitResponse(
       id: json['id']?.toString() ?? '',
-      recordedAt: DateTime.tryParse(
-            json['recorded_at']?.toString() ??
-                json['recordedAt']?.toString() ??
-                '',
+      recordedAt: AppDateFormat.parseApi(
+            json['recorded_at'] ?? json['recordedAt'],
           ) ??
           DateTime.now(),
       type: json['type']?.toString() ?? 'checkin',
@@ -119,8 +163,8 @@ class PendingAttendance extends Equatable {
     return PendingAttendance(
       id: json['id']?.toString() ?? '',
       encryptedPayload: json['encrypted_payload']?.toString() ?? '',
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-          DateTime.now(),
+      createdAt:
+          AppDateFormat.parseApi(json['created_at']) ?? DateTime.now(),
       syncStatus: json['sync_status']?.toString() ?? 'pending',
     );
   }

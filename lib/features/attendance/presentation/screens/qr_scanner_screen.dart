@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,9 +8,13 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/errors/failures.dart';
+import '../../../../features/attendance/data/models/attendance_models.dart';
 import '../../../../features/attendance/data/models/pointage_mobile_models.dart';
+import '../../../../providers/app_providers.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
+import '../../../../widgets/feedback/app_toast.dart';
 import 'biometric_validate_screen.dart';
 
 class QrScannerScreen extends ConsumerStatefulWidget {
@@ -23,12 +28,22 @@ class QrScannerScreen extends ConsumerStatefulWidget {
 
 class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
+    detectionSpeed: DetectionSpeed.noDuplicates,
     facing: CameraFacing.back,
     torchEnabled: false,
+    formats: const [BarcodeFormat.qrCode],
   );
 
   bool _handled = false;
+  bool _validating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(gpsVerificationServiceProvider).warmUpLocation();
+    });
+  }
 
   @override
   void dispose() {
@@ -82,33 +97,99 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     }
   }
 
-  void _startManual(PointageSiteSummary site, String type) {
+  Future<void> _startManual(PointageSiteSummary site, String type) async {
     final payload = jsonEncode({'code_public': site.codePublic});
-    ref.read(pendingAttendanceProvider.notifier).state =
-        PendingAttendancePayload(qrPayload: payload, type: type);
-    context.push(BiometricValidateScreen.routePath);
+    await _validateAndOpenBiometric(
+      qrPayload: payload,
+      type: type,
+    );
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_handled) return;
+    if (_handled || _validating) return;
     for (final b in capture.barcodes) {
       final raw = b.rawValue;
       if (raw != null && raw.isNotEmpty) {
         _handled = true;
-        final payload = _inferPayload(raw);
-        ref.read(pendingAttendanceProvider.notifier).state = payload;
-        context.push(BiometricValidateScreen.routePath);
+        final pending = _inferPayload(raw);
+        _validateAndOpenBiometric(
+          qrPayload: pending.qrPayload,
+          type: pending.type,
+        );
         break;
       }
     }
   }
 
   PendingAttendancePayload _inferPayload(String raw) {
-    var type = 'checkin';
-    if (raw.toLowerCase().contains('checkout')) {
-      type = 'checkout';
-    }
+    final local = ref.read(todayAttendanceUiProvider);
+    final api = ref.read(pointageTodayProvider).valueOrNull;
+    final type = resolveNextAttendanceType(
+      checkIn: local.checkIn ?? api?.checkIn,
+      checkOut: local.checkOut ?? api?.checkOut,
+    );
     return PendingAttendancePayload(qrPayload: raw, type: type);
+  }
+
+  /// GPS appareil + validation serveur vs site du QR (équipement sur place).
+  Future<void> _validateAndOpenBiometric({
+    required String qrPayload,
+    required String type,
+  }) async {
+    if (_validating) return;
+    setState(() => _validating = true);
+
+    try {
+      final gps = ref.read(gpsVerificationServiceProvider);
+      final pos = await gps.getCurrentPosition();
+
+      final remote = ref.read(attendanceRemoteDataSourceProvider);
+      final scan = await remote.validateScan(
+        AttendanceScanRequest(
+          qrPayload: qrPayload,
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        ),
+      );
+
+      if (!scan.valid) {
+        throw const LocationFailure('Scan refusé par le serveur.');
+      }
+
+      ref.read(pendingAttendanceProvider.notifier).state =
+          PendingAttendancePayload(
+        qrPayload: qrPayload,
+        type: type,
+        officeZone: scan.officeZone,
+        scanValidated: true,
+        scanLatitude: pos.latitude,
+        scanLongitude: pos.longitude,
+      );
+
+      if (!mounted) return;
+      await context.push(BiometricValidateScreen.routePath);
+    } on Failure catch (e) {
+      if (mounted) {
+        showAppToast(context, e.message, type: ToastType.error);
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppToast(
+          context,
+          e is TimeoutException
+              ? 'GPS trop lent : activez la localisation précise et réessayez.'
+              : 'Scan impossible : $e',
+          type: ToastType.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _validating = false;
+          _handled = false;
+        });
+      }
+    }
   }
 
   @override
@@ -122,6 +203,24 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
             controller: _controller,
             onDetect: _onDetect,
           ),
+          if (_validating)
+            Container(
+              color: Colors.black54,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Vérification GPS du site…',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                        ),
+                  ),
+                ],
+              ),
+            ),
           Align(
             alignment: Alignment.center,
             child: Container(
@@ -165,7 +264,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                 backgroundColor: Colors.white24,
                 foregroundColor: Colors.white,
               ),
-              onPressed: _openSitePicker,
+              onPressed: _validating ? null : _openSitePicker,
               icon: const Icon(Icons.apartment_rounded),
               tooltip: 'Sites (sans QR)',
             ),
@@ -191,11 +290,11 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton.filledTonal(
-                      onPressed: () => context.pop(),
+                      onPressed: _validating ? null : () => context.pop(),
                       icon: const Icon(Icons.arrow_back),
                     ),
                     IconButton.filledTonal(
-                      onPressed: () => _controller.toggleTorch(),
+                      onPressed: _validating ? null : () => _controller.toggleTorch(),
                       icon: const Icon(Icons.flashlight_on_outlined),
                     ),
                   ],

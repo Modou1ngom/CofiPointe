@@ -1,5 +1,4 @@
-/// Chemins relatifs à [EnvConfig.apiBaseUrl], en pratique le préfixe Laravel
-/// `.../api/mobile` (voir `routes/api.php`, groupe `prefix('mobile')`).
+/// Chemins relatifs à [EnvConfig.apiBaseUrl] (`.../api`, voir `routes/api.php`).
 ///
 /// Récap des routes protégées (sauf login / verify-otp) : en-tête
 /// `Authorization: Bearer {token}` + middleware `auth:sanctum`, `api.active`.
@@ -23,6 +22,7 @@ abstract final class ApiEndpoints {
   static const logout = '/logout';
   static const registerDevice = '/register-device';
 
+  static const attendanceScan = '/attendance/scan';
   static const checkIn = '/attendance/checkin';
   static const checkOut = '/attendance/checkout';
   static const attendanceHistory = '/attendance/history';

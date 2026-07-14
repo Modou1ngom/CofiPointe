@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
@@ -17,7 +18,6 @@ class HistoryScreen extends ConsumerWidget {
     final async = ref.watch(attendanceHistoryProvider);
     final monthFmt = DateFormat('MMMM yyyy', 'fr_FR');
     final dayFmt = DateFormat('EEEE d MMMM', 'fr_FR');
-    final timeFmt = DateFormat('hh:mm a', 'en_US');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Historique')),
@@ -94,7 +94,7 @@ class HistoryScreen extends ConsumerWidget {
                                         context,
                                         'Entrée',
                                         r.checkIn != null
-                                            ? timeFmt.format(r.checkIn!)
+                                            ? AppDateFormat.formatTime12h(r.checkIn!)
                                             : '--:--',
                                       ),
                                       const SizedBox(width: AppSpacing.md),
@@ -102,7 +102,7 @@ class HistoryScreen extends ConsumerWidget {
                                         context,
                                         'Sortie',
                                         r.checkOut != null
-                                            ? timeFmt.format(r.checkOut!)
+                                            ? AppDateFormat.formatTime12h(r.checkOut!)
                                             : '--:--',
                                       ),
                                     ],

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
+import '../../../../config/env.dart';
 import '../../../../config/test_fixtures.dart';
+import '../../../../models/office_zone.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_exception.dart';
 import '../models/attendance_models.dart';
@@ -11,6 +13,39 @@ class AttendanceRemoteDataSource {
 
   final Dio _dio;
   final bool useTestData;
+
+  /// Valide QR + GPS appareil ; renvoie la zone du site scanné.
+  Future<AttendanceScanResponse> validateScan(AttendanceScanRequest body) async {
+    if (useTestData) {
+      await TestFixtures.simulateNetworkDelay();
+      return AttendanceScanResponse(
+        valid: true,
+        message: 'Scan test OK',
+        officeZone: OfficeZone.fromEnv(
+          const EnvConfig(
+            apiBaseUrl: '',
+            officeLatitude: 14.7167,
+            officeLongitude: -17.4677,
+            allowedRadiusMeters: 500,
+            useTestData: true,
+          ),
+        ),
+      );
+    }
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        ApiEndpoints.attendanceScan,
+        data: body.toJson(),
+      );
+      final data = res.data;
+      if (data == null) {
+        throw Exception('Réponse vide');
+      }
+      return AttendanceScanResponse.fromJson(data);
+    } catch (e) {
+      throw mapDioException(e);
+    }
+  }
 
   Future<AttendanceSubmitResponse> checkIn(AttendanceSubmitRequest body) =>
       _submit(ApiEndpoints.checkIn, body);
@@ -78,11 +113,18 @@ class AttendanceRemoteDataSource {
     }
     try {
       final res = await _dio.get<Map<String, dynamic>>(ApiEndpoints.pointageToday);
-      final data = res.data;
-      if (data == null) return PointageTodaySummary.empty;
-      final list = data['data'];
-      if (list is! List) return PointageTodaySummary.empty;
-      return PointageTodaySummary.fromTodayApiList(list);
+      final root = res.data;
+      if (root == null) return PointageTodaySummary.empty;
+      final data = root['data'] ?? root;
+      if (data is List) {
+        return PointageTodaySummary.fromTodayApiList(data);
+      }
+      if (data is Map) {
+        return PointageTodaySummary.fromTodayApiMap(
+          Map<String, dynamic>.from(data),
+        );
+      }
+      return PointageTodaySummary.empty;
     } catch (e) {
       throw mapDioException(e);
     }

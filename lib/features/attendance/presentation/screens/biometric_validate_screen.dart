@@ -37,18 +37,42 @@ class _BiometricValidateScreenState
 
     setState(() => _busy = true);
     try {
+      final local = ref.read(todayAttendanceUiProvider);
+      final api = ref.read(pointageTodayProvider).valueOrNull;
+      final checkIn = local.checkIn ?? api?.checkIn;
+      final checkOut = local.checkOut ?? api?.checkOut;
+      final effectiveType =
+          checkIn != null && checkOut == null ? 'checkout' : pending.type;
+
       final gps = ref.read(gpsVerificationServiceProvider);
-      final pos = await gps.verifyWithinOfficeZone();
+      late final double latitude;
+      late final double longitude;
+      if (pending.scanValidated &&
+          pending.scanLatitude != null &&
+          pending.scanLongitude != null) {
+        latitude = pending.scanLatitude!;
+        longitude = pending.scanLongitude!;
+      } else if (pending.scanValidated) {
+        final pos = await gps.getCurrentPosition();
+        latitude = pos.latitude;
+        longitude = pos.longitude;
+      } else {
+        final zone = pending.officeZone ??
+            ref.read(pointageTodayProvider).valueOrNull?.officeZone;
+        final pos = await gps.verifyWithinOfficeZone(zone: zone);
+        latitude = pos.latitude;
+        longitude = pos.longitude;
+      }
 
       final bio = ref.read(biometricServiceProvider);
       final nonce = await bio.createNonce();
 
       final body = AttendanceSubmitRequest(
         qrPayload: pending.qrPayload,
-        latitude: pos.latitude,
-        longitude: pos.longitude,
+        latitude: latitude,
+        longitude: longitude,
         biometricNonce: nonce,
-        type: pending.type,
+        type: effectiveType,
       );
 
       final remote = ref.read(attendanceRemoteDataSourceProvider);
@@ -56,7 +80,7 @@ class _BiometricValidateScreenState
 
       AttendanceSubmitResponse res;
       try {
-        res = pending.type == 'checkout'
+        res = effectiveType == 'checkout'
             ? await remote.checkOut(body)
             : await remote.checkIn(body);
       } on Failure catch (e) {
@@ -78,7 +102,7 @@ class _BiometricValidateScreenState
       }
 
       final ui = ref.read(todayAttendanceUiProvider.notifier);
-      if (pending.type == 'checkout') {
+      if (effectiveType == 'checkout') {
         ui.setCheckOut(res.recordedAt);
       } else {
         ui.setCheckIn(res.recordedAt);
@@ -90,11 +114,19 @@ class _BiometricValidateScreenState
         SuccessScreen.routePath,
         extra: AttendanceSuccessArgs(
           recordedAt: res.recordedAt,
-          kind: pending.type == 'checkout' ? 'Sortie' : 'Entrée',
+          kind: effectiveType == 'checkout' ? 'Sortie' : 'Entrée',
         ),
       );
     } on Failure catch (e) {
       showAppToast(context, e.message, type: ToastType.error);
+    } catch (_) {
+      if (mounted) {
+        showAppToast(
+          context,
+          'Erreur lors du pointage. Réessayez.',
+          type: ToastType.error,
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

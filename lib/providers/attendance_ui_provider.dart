@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/office_zone.dart';
+
 class TodayAttendanceUiState {
   const TodayAttendanceUiState({
     this.checkIn,
@@ -48,11 +50,32 @@ class PendingAttendancePayload {
   PendingAttendancePayload({
     required this.qrPayload,
     required this.type,
+    this.officeZone,
+    this.scanValidated = false,
+    this.scanLatitude,
+    this.scanLongitude,
   });
 
   final String qrPayload;
   final String type;
+  /// Zone du site issu du QR (POST /attendance/scan).
+  final OfficeZone? officeZone;
+  /// GPS déjà validé côté serveur au scan — ne pas re-comparer aux coords .env.
+  final bool scanValidated;
+  /// Position utilisée lors de la validation scan (évite un 2e fix GPS).
+  final double? scanLatitude;
+  final double? scanLongitude;
 }
 
 final pendingAttendanceProvider =
     StateProvider<PendingAttendancePayload?>((ref) => null);
+
+/// Entrée déjà faite aujourd’hui → prochain pointage = sortie.
+String resolveNextAttendanceType({
+  DateTime? checkIn,
+  DateTime? checkOut,
+}) {
+  if (checkIn != null && checkOut == null) return 'checkout';
+  if (checkIn == null) return 'checkin';
+  return 'checkout';
+}

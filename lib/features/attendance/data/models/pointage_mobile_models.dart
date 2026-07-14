@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/utils/app_date_format.dart';
+import '../../../../models/office_zone.dart';
+
 /// Site actif renvoyé par `GET /pointage/sites`.
 class PointageSiteSummary extends Equatable {
   const PointageSiteSummary({
@@ -43,10 +46,8 @@ class PointageTodayRow extends Equatable {
     return PointageTodayRow(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       sens: json['sens']?.toString() ?? '',
-      enregistreAt: DateTime.tryParse(
-            json['enregistre_at']?.toString() ??
-                json['enregistreAt']?.toString() ??
-                '',
+      enregistreAt: AppDateFormat.parseApi(
+            json['enregistre_at'] ?? json['enregistreAt'],
           ) ??
           DateTime.now(),
     );
@@ -62,6 +63,7 @@ class PointageTodaySummary extends Equatable {
     this.checkIn,
     this.checkOut,
     this.rows = const [],
+    this.officeZone,
   });
 
   static const PointageTodaySummary empty = PointageTodaySummary();
@@ -69,6 +71,19 @@ class PointageTodaySummary extends Equatable {
   final DateTime? checkIn;
   final DateTime? checkOut;
   final List<PointageTodayRow> rows;
+  final OfficeZone? officeZone;
+
+  /// Réponse agrégée `GET /pointage/today` (`check_in` / `check_out`).
+  factory PointageTodaySummary.fromTodayApiMap(Map<String, dynamic> json) {
+    final zoneRaw = json['office_zone'] ?? json['officeZone'];
+    return PointageTodaySummary(
+      checkIn: AppDateFormat.parseApi(json['check_in'] ?? json['checkIn']),
+      checkOut: AppDateFormat.parseApi(json['check_out'] ?? json['checkOut']),
+      officeZone: zoneRaw is Map
+          ? OfficeZone.fromJson(Map<String, dynamic>.from(zoneRaw))
+          : null,
+    );
+  }
 
   /// `sens` attendus : `entree`, `sortie`.
   factory PointageTodaySummary.fromTodayApiList(List<dynamic> list) {
@@ -96,5 +111,5 @@ class PointageTodaySummary extends Equatable {
   }
 
   @override
-  List<Object?> get props => [checkIn, checkOut, rows];
+  List<Object?> get props => [checkIn, checkOut, rows, officeZone];
 }

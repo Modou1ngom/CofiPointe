@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
@@ -28,9 +28,7 @@ class SuccessScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final timeFmt = DateFormat('hh:mm a');
-    final dateFmt = DateFormat('EEEE d MMMM yyyy');
-    final at = args?.recordedAt ?? DateTime.now();
+    final at = (args?.recordedAt ?? DateTime.now()).toLocal();
     final kind = args?.kind ?? 'Pointage';
 
     return Scaffold(
@@ -58,14 +56,14 @@ class SuccessScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                timeFmt.format(at),
+                AppDateFormat.formatTime12h(at),
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
               ),
               Text(
-                dateFmt.format(at),
+                AppDateFormat.formatDateLong(at),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -87,7 +85,7 @@ class SuccessScreen extends ConsumerWidget {
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             Text(
-                              timeFmt.format(at),
+                              AppDateFormat.formatTime12h(at),
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),

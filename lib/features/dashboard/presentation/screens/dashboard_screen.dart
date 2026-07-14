@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/dashboard_summary_provider.dart';
@@ -29,7 +28,6 @@ class DashboardScreen extends ConsumerWidget {
     final checkOut = local.checkOut ?? api?.checkOut;
     final summary = ref.watch(dashboardSummaryProvider);
     final name = session.user?.fullName ?? 'Collaborateur';
-    final timeFmt = DateFormat('hh:mm a', 'en_US');
     final scheme = Theme.of(context).colorScheme;
 
     final present = checkIn != null;
@@ -126,7 +124,7 @@ class DashboardScreen extends ConsumerWidget {
                       if (entry != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Entrée : ${timeFmt.format(entry)}',
+                          'Entrée : ${AppDateFormat.formatTime12h(entry)}',
                           style: TextStyle(
                             color: scheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
@@ -259,14 +257,17 @@ class DashboardScreen extends ConsumerWidget {
                   _timeColumn(
                     context,
                     label: 'Entrée',
-                    value: entry != null ? timeFmt.format(entry) : '--:--',
+                    value:
+                        entry != null ? AppDateFormat.formatTime12h(entry) : '--:--',
                     accent: AppColors.success,
                   ),
                   const SizedBox(width: AppSpacing.lg),
                   _timeColumn(
                     context,
                     label: 'Sortie',
-                    value: checkOut != null ? timeFmt.format(checkOut) : '--:--',
+                    value: checkOut != null
+                        ? AppDateFormat.formatTime12h(checkOut)
+                        : '--:--',
                     accent: AppColors.primary,
                   ),
                 ],

@@ -27,9 +27,11 @@ class EnvConfig {
             ? (kIsWeb
                 // Web : le navigateur impose le CORS ; l’API doit autoriser
                 // l’origine du serveur de dev Flutter (ex. http://localhost:xxxxx).
-                ? 'http://localhost:8000/api/mobile'
-                : 'http://127.0.0.1:8000/api/mobile')
-            : 'https://api.example.com');
+                ? 'https://pointer.cofsn.mawena.cloud/api'
+                // Téléphone physique : remplacer par l’IP LAN du PC, ex.
+                // flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api
+                : 'https://pointer.cofsn.mawena.cloud/api')  
+            : 'https://pointer.cofsn.mawena.cloud/api');
     const lat = String.fromEnvironment('OFFICE_LAT', defaultValue: '14.7167');
     const lng = String.fromEnvironment('OFFICE_LNG', defaultValue: '-17.4677');
     const radius = String.fromEnvironment(
