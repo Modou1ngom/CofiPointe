@@ -63,6 +63,22 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   String get _code => _controllers.map((c) => c.text).join();
 
+  void _applyOtpDigits(String raw, {int startIndex = 0}) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+
+    for (var j = 0; j < 6; j++) {
+      final idx = startIndex + j;
+      if (idx >= 6) break;
+      _controllers[idx].text = j < digits.length ? digits[j] : '';
+    }
+
+    final filled = _code.length.clamp(0, 6);
+    final focusIndex = filled >= 6 ? 5 : filled;
+    _nodes[focusIndex].requestFocus();
+    setState(() {});
+  }
+
   Future<void> _verify() async {
     final id = ref.read(otpIdentifierProvider);
     if (id == null || id.isEmpty) {
@@ -135,19 +151,64 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(6, (i) {
                 return SizedBox(
-                  width: 44,
+                  width: 48,
+                  height: 56,
                   child: TextField(
                     controller: _controllers[i],
                     focusNode: _nodes[i],
                     textAlign: TextAlign.center,
                     keyboardType: TextInputType.number,
-                    maxLength: 1,
-                    decoration: const InputDecoration(counterText: ''),
+                    textInputAction:
+                        i == 5 ? TextInputAction.done : TextInputAction.next,
+                    obscureText: false,
+                    enableInteractiveSelection: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    autofillHints: i == 0
+                        ? const [AutofillHints.oneTimeCode]
+                        : null,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      height: 1.2,
+                    ),
+                    cursorColor: scheme.primary,
+                    decoration: InputDecoration(
+                      counterText: '',
+                      filled: true,
+                      fillColor: scheme.surfaceContainerHighest
+                          .withValues(alpha: 0.65),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: scheme.outlineVariant),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: scheme.primary, width: 2),
+                      ),
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
+                      // Autorise un collage multi-chiffres (sinon maxLength: 1 bloque).
+                      LengthLimitingTextInputFormatter(6),
                     ],
                     onChanged: (v) {
-                      if (v.isNotEmpty && i < 5) {
+                      if (v.length > 1) {
+                        // Coller "123456" (ou SMS autofill) dans une case.
+                        _applyOtpDigits(v, startIndex: i);
+                        if (_code.length == 6) {
+                          FocusScope.of(context).unfocus();
+                        }
+                        return;
+                      }
+                      // Saisie manuelle : 1 chiffre par case.
+                      if (v.length == 1 && i < 5) {
                         _nodes[i + 1].requestFocus();
                       }
                       if (v.isEmpty && i > 0) {
@@ -158,6 +219,13 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ),
                 );
               }),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Astuce : vous pouvez coller le code à 6 chiffres d’un coup.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Row(

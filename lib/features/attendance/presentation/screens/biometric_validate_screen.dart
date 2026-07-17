@@ -11,6 +11,8 @@ import 'success_screen.dart';
 import '../../../../providers/app_providers.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
+import '../../../../services/device_info_service.dart';
+import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 
@@ -67,12 +69,25 @@ class _BiometricValidateScreenState
       final bio = ref.read(biometricServiceProvider);
       final nonce = await bio.createNonce();
 
+      // Empreinte appareil pour le blocage multi-comptes (même jour) côté Laravel.
+      var deviceId =
+          await ref.read(secureStorageServiceProvider).readDeviceId();
+      String? serialNumber;
+      final deviceInfo = await DeviceInfoService().collect();
+      if (deviceId == null || deviceId.trim().isEmpty || deviceId == 'unknown') {
+        deviceId = deviceInfo.deviceId;
+        await ref.read(secureStorageServiceProvider).writeDeviceId(deviceId);
+      }
+      serialNumber = deviceInfo.serialNumber;
+
       final body = AttendanceSubmitRequest(
         qrPayload: pending.qrPayload,
         latitude: latitude,
         longitude: longitude,
         biometricNonce: nonce,
         type: effectiveType,
+        deviceId: deviceId,
+        serialNumber: serialNumber,
       );
 
       final remote = ref.read(attendanceRemoteDataSourceProvider);

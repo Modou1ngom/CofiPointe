@@ -10,12 +10,15 @@ class DeviceRegistrationInfo {
     required this.deviceId,
     required this.osVersion,
     required this.appVersion,
+    this.serialNumber,
   });
 
   final String model;
   final String deviceId;
   final String osVersion;
   final String appVersion;
+  /// N° de série matériel quand disponible (Android) ; sinon null.
+  final String? serialNumber;
 }
 
 class DeviceInfoService {
@@ -25,6 +28,7 @@ class DeviceInfoService {
     String model = 'Appareil';
     String deviceId = 'unknown';
     String os = '';
+    String? serialNumber;
 
     if (kIsWeb) {
       final web = await plugin.webBrowserInfo;
@@ -36,11 +40,21 @@ class DeviceInfoService {
       model = '${a.manufacturer} ${a.model}';
       deviceId = a.id;
       os = 'Android ${a.version.release}';
+      final sn = a.serialNumber.trim();
+      if (sn.isNotEmpty &&
+          sn.toLowerCase() != 'unknown' &&
+          sn.toLowerCase() != 'unauthorized') {
+        serialNumber = sn;
+      }
     } else if (Platform.isIOS) {
       final i = await plugin.iosInfo;
       model = i.utsname.machine ?? i.model ?? 'iPhone';
       deviceId = i.identifierForVendor ?? 'ios';
       os = '${i.systemName} ${i.systemVersion}';
+      // Sur iOS, l’identifiant vendor sert aussi d’empreinte stable.
+      if (deviceId != 'ios') {
+        serialNumber = deviceId;
+      }
     }
 
     return DeviceRegistrationInfo(
@@ -48,6 +62,7 @@ class DeviceInfoService {
       deviceId: deviceId,
       osVersion: os,
       appVersion: '${pkg.version}+${pkg.buildNumber}',
+      serialNumber: serialNumber,
     );
   }
 }

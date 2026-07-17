@@ -88,6 +88,8 @@ class AttendanceSubmitRequest extends Equatable {
     required this.longitude,
     required this.biometricNonce,
     required this.type,
+    this.deviceId,
+    this.serialNumber,
   });
 
   final String qrPayload;
@@ -96,6 +98,8 @@ class AttendanceSubmitRequest extends Equatable {
   final String biometricNonce;
   /// `checkin` ou `checkout`
   final String type;
+  final String? deviceId;
+  final String? serialNumber;
 
   Map<String, dynamic> toJson() => {
         'qr_payload': qrPayload,
@@ -103,11 +107,22 @@ class AttendanceSubmitRequest extends Equatable {
         'longitude': longitude,
         'biometric_nonce': biometricNonce,
         'type': type,
+        if (deviceId != null && deviceId!.trim().isNotEmpty)
+          'device_id': deviceId!.trim(),
+        if (serialNumber != null && serialNumber!.trim().isNotEmpty)
+          'serial_number': serialNumber!.trim(),
       };
 
   @override
-  List<Object?> get props =>
-      [qrPayload, latitude, longitude, biometricNonce, type];
+  List<Object?> get props => [
+        qrPayload,
+        latitude,
+        longitude,
+        biometricNonce,
+        type,
+        deviceId,
+        serialNumber,
+      ];
 }
 
 class AttendanceSubmitResponse extends Equatable {

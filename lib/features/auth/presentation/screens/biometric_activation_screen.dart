@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../providers/app_providers.dart';
+import '../../../../services/biometric_service.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 import '../../../../widgets/feedback/app_toast.dart';
@@ -30,6 +31,7 @@ class _BiometricActivationScreenState
   bool _loading = false;
 
   Future<void> _activate() async {
+    if (_loading) return;
     setState(() => _loading = true);
     try {
       final bio = ref.read(biometricServiceProvider);
@@ -37,13 +39,35 @@ class _BiometricActivationScreenState
         localizedReason: _choice == _BioChoice.fingerprint
             ? 'Activer l’empreinte digitale'
             : 'Activer la reconnaissance faciale',
+        preferred: _choice == _BioChoice.fingerprint
+            ? BiometricKind.fingerprint
+            : BiometricKind.face,
       );
-      await ref.read(sessionControllerProvider.notifier).setBiometricEnabled(true);
-      await ref.read(sessionControllerProvider.notifier).setBiometricOnboardingDone(true);
+      await ref
+          .read(sessionControllerProvider.notifier)
+          .setBiometricEnabled(true);
+      await ref
+          .read(sessionControllerProvider.notifier)
+          .setBiometricOnboardingDone(true);
       if (!mounted) return;
+      showAppToast(
+        context,
+        _choice == _BioChoice.fingerprint
+            ? 'Empreinte activée'
+            : 'Reconnaissance faciale activée',
+        type: ToastType.success,
+      );
       context.go(DashboardScreen.routePath);
     } on Failure catch (e) {
+      if (!mounted) return;
       showAppToast(context, e.message, type: ToastType.error);
+    } catch (e) {
+      if (!mounted) return;
+      showAppToast(
+        context,
+        'Impossible d’activer la biométrie. Réessayez.',
+        type: ToastType.error,
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }

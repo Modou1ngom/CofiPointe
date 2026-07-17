@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../config/env.dart';
@@ -28,6 +29,16 @@ class GpsVerificationService {
     }
   }
 
+  /// `getLastKnownPosition` n'existe pas sur le web (Safari iPhone / PWA).
+  Future<Position?> _lastKnownOrNull() async {
+    if (kIsWeb) return null;
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Prépare le GPS dès l’ouverture du scanner (dernière position + fix en arrière-plan).
   Future<void> warmUpLocation() async {
     try {
@@ -35,7 +46,7 @@ class GpsVerificationService {
       if (!await Geolocator.isLocationServiceEnabled()) {
         return;
       }
-      await Geolocator.getLastKnownPosition();
+      await _lastKnownOrNull();
       unawaited(
         Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
@@ -55,7 +66,7 @@ class GpsVerificationService {
       throw const LocationFailure('Activez le GPS pour continuer.');
     }
 
-    final last = await Geolocator.getLastKnownPosition();
+    final last = await _lastKnownOrNull();
     if (last != null && _positionAge(last) <= _freshMaxAge) {
       return last;
     }
