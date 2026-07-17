@@ -139,13 +139,22 @@ class AttendanceSubmitResponse extends Equatable {
   final String? message;
 
   factory AttendanceSubmitResponse.fromJson(Map<String, dynamic> json) {
+    final rawType = json['type']?.toString() ??
+        json['pointage_type']?.toString() ??
+        'checkin';
+    final normalized = rawType.trim().toLowerCase();
+    final type = (normalized == 'depart' ||
+            normalized == 'sortie' ||
+            normalized == 'checkout')
+        ? 'checkout'
+        : 'checkin';
     return AttendanceSubmitResponse(
       id: json['id']?.toString() ?? '',
       recordedAt: AppDateFormat.parseApi(
             json['recorded_at'] ?? json['recordedAt'],
           ) ??
           DateTime.now(),
-      type: json['type']?.toString() ?? 'checkin',
+      type: type,
       message: json['message']?.toString(),
     );
   }

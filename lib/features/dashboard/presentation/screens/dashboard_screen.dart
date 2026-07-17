@@ -10,6 +10,7 @@ import '../../../../providers/dashboard_summary_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/cards/glass_card.dart';
+import '../../../attendance/data/models/pointage_mobile_models.dart';
 import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 
@@ -24,14 +25,51 @@ class DashboardScreen extends ConsumerWidget {
     final todayAsync = ref.watch(pointageTodayProvider);
     final local = ref.watch(todayAttendanceUiProvider);
     final api = todayAsync.valueOrNull;
-    final checkIn = local.checkIn ?? api?.checkIn;
-    final checkOut = local.checkOut ?? api?.checkOut;
+
+    // Aligne le cache local sur le serveur dès qu’il répond.
+    ref.listen<AsyncValue<PointageTodaySummary>>(pointageTodayProvider, (
+      previous,
+      next,
+    ) {
+      next.whenData((summary) {
+        ref.read(todayAttendanceUiProvider.notifier).syncToday(
+              checkIn: summary.checkIn,
+              checkOut: summary.checkOut,
+            );
+      });
+    });
+
+    // Dès que le serveur a répondu, ses valeurs priment (même si null).
+    final checkIn = todayAsync.hasValue ? api?.checkIn : local.checkIn;
+    final checkOut = todayAsync.hasValue ? api?.checkOut : local.checkOut;
     final summary = ref.watch(dashboardSummaryProvider);
     final name = session.user?.fullName ?? 'Collaborateur';
     final scheme = Theme.of(context).colorScheme;
 
-    final present = checkIn != null;
-    final entry = checkIn;
+    final hasEntry = checkIn != null;
+    final hasExit = checkOut != null;
+    final present = hasEntry || hasExit;
+
+    String statusTitle;
+    if (hasEntry && hasExit) {
+      statusTitle = 'Présent';
+    } else if (hasExit && !hasEntry) {
+      statusTitle = 'Sortie enregistrée';
+    } else if (hasEntry) {
+      statusTitle = 'Présent';
+    } else {
+      statusTitle = 'En attente de pointage';
+    }
+
+    String? statusDetail;
+    if (hasEntry && hasExit) {
+      statusDetail =
+          'Entrée : ${AppDateFormat.formatTime12h(checkIn)} · Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
+    } else if (hasExit && !hasEntry) {
+      statusDetail = 'Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
+    } else if (hasEntry) {
+      statusDetail = 'Entrée : ${AppDateFormat.formatTime12h(checkIn)}';
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -115,16 +153,16 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        present ? 'Présent' : 'En attente de pointage',
+                        statusTitle,
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 20,
                         ),
                       ),
-                      if (entry != null) ...[
+                      if (statusDetail != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Entrée : ${AppDateFormat.formatTime12h(entry)}',
+                          statusDetail,
                           style: TextStyle(
                             color: scheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
@@ -257,8 +295,9 @@ class DashboardScreen extends ConsumerWidget {
                   _timeColumn(
                     context,
                     label: 'Entrée',
-                    value:
-                        entry != null ? AppDateFormat.formatTime12h(entry) : '--:--',
+                    value: checkIn != null
+                        ? AppDateFormat.formatTime12h(checkIn)
+                        : '--:--',
                     accent: AppColors.success,
                   ),
                   const SizedBox(width: AppSpacing.lg),

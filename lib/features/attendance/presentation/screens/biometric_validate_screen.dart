@@ -95,6 +95,7 @@ class _BiometricValidateScreenState
 
       AttendanceSubmitResponse res;
       try {
+        // Les deux endpoints convergent côté Laravel ; le type réel dépend de l’heure (plage).
         res = effectiveType == 'checkout'
             ? await remote.checkOut(body)
             : await remote.checkIn(body);
@@ -116,11 +117,21 @@ class _BiometricValidateScreenState
         rethrow;
       }
 
+      // Toujours se fier au type renvoyé par le serveur (plages horaires).
+      final recordedAsCheckout = _isCheckoutType(res.type);
       final ui = ref.read(todayAttendanceUiProvider.notifier);
-      if (effectiveType == 'checkout') {
-        ui.setCheckOut(res.recordedAt);
+      final apiToday = ref.read(pointageTodayProvider).valueOrNull;
+      if (recordedAsCheckout) {
+        // Ne pas inventer une Entrée : garder seulement une entrée déjà connue serveur.
+        ui.syncToday(
+          checkIn: apiToday?.checkIn,
+          checkOut: res.recordedAt,
+        );
       } else {
-        ui.setCheckIn(res.recordedAt);
+        ui.syncToday(
+          checkIn: res.recordedAt,
+          checkOut: apiToday?.checkOut,
+        );
       }
       ref.invalidate(pointageTodayProvider);
 
@@ -129,7 +140,7 @@ class _BiometricValidateScreenState
         SuccessScreen.routePath,
         extra: AttendanceSuccessArgs(
           recordedAt: res.recordedAt,
-          kind: effectiveType == 'checkout' ? 'Sortie' : 'Entrée',
+          kind: recordedAsCheckout ? 'Sortie' : 'Entrée',
         ),
       );
     } on Failure catch (e) {
@@ -145,6 +156,11 @@ class _BiometricValidateScreenState
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  bool _isCheckoutType(String type) {
+    final t = type.trim().toLowerCase();
+    return t == 'checkout' || t == 'depart' || t == 'sortie';
   }
 
   @override

@@ -36,6 +36,15 @@ class TodayAttendanceNotifier extends StateNotifier<TodayAttendanceUiState> {
     );
   }
 
+  /// Remplace l’état du jour par les valeurs serveur (null = pas de pointage).
+  void syncToday({DateTime? checkIn, DateTime? checkOut}) {
+    state = TodayAttendanceUiState(
+      checkIn: checkIn,
+      checkOut: checkOut,
+      lastUpdated: DateTime.now(),
+    );
+  }
+
   void reset() {
     state = const TodayAttendanceUiState();
   }
