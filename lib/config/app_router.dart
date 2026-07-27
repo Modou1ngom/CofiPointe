@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/attendance/presentation/screens/biometric_validate_screen.dart';
+import '../features/attendance/presentation/screens/matricule_validate_screen.dart';
 import '../features/attendance/presentation/screens/qr_scanner_screen.dart';
 import '../features/attendance/presentation/screens/success_screen.dart';
+import '../features/declarations/presentation/screens/declarations_screen.dart';
 import '../features/auth/presentation/screens/biometric_activation_screen.dart';
 import '../features/auth/presentation/screens/device_registration_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
@@ -135,6 +137,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: BiometricValidateScreen.routePath,
         builder: (_, __) => const BiometricValidateScreen(),
+      ),
+      GoRoute(
+        path: MatriculeValidateScreen.routePath,
+        builder: (_, __) => const MatriculeValidateScreen(),
+      ),
+      GoRoute(
+        path: DeclarationsScreen.routePath,
+        builder: (_, __) => const DeclarationsScreen(),
       ),
       GoRoute(
         path: SuccessScreen.routePath,

@@ -12,6 +12,7 @@ import '../../../../services/session_controller.dart';
 import '../../../../widgets/cards/glass_card.dart';
 import '../../../attendance/data/models/pointage_mobile_models.dart';
 import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
+import '../../../declarations/presentation/screens/declarations_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -234,6 +235,12 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
           ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.04),
+          const SizedBox(height: AppSpacing.md),
+          OutlinedButton.icon(
+            onPressed: () => context.push(DeclarationsScreen.routePath),
+            icon: const Icon(Icons.description_outlined),
+            label: const Text('Mes déclarations'),
+          ),
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Résumé aujourd’hui',

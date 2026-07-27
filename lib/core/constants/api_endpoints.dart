@@ -23,6 +23,7 @@ abstract final class ApiEndpoints {
   static const registerDevice = '/register-device';
 
   static const attendanceScan = '/attendance/scan';
+  static const virtualRequestOtp = '/attendance/virtual/request-otp';
   static const checkIn = '/attendance/checkin';
   static const checkOut = '/attendance/checkout';
   static const attendanceHistory = '/attendance/history';
@@ -34,4 +35,6 @@ abstract final class ApiEndpoints {
   static const pointageSites = '/pointage/sites';
   static const pointage = '/pointage';
   static const pointageToday = '/pointage/today';
+
+  static const declarations = '/declarations';
 }

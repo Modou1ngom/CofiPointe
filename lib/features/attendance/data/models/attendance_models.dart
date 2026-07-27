@@ -39,20 +39,29 @@ class AttendanceScanRequest extends Equatable {
     required this.qrPayload,
     required this.latitude,
     required this.longitude,
+    this.deviceId,
+    this.serialNumber,
   });
 
   final String qrPayload;
   final double latitude;
   final double longitude;
+  final String? deviceId;
+  final String? serialNumber;
 
   Map<String, dynamic> toJson() => {
         'qr_payload': qrPayload,
         'latitude': latitude,
         'longitude': longitude,
+        if (deviceId != null && deviceId!.trim().isNotEmpty)
+          'device_id': deviceId!.trim(),
+        if (serialNumber != null && serialNumber!.trim().isNotEmpty)
+          'serial_number': serialNumber!.trim(),
       };
 
   @override
-  List<Object?> get props => [qrPayload, latitude, longitude];
+  List<Object?> get props =>
+      [qrPayload, latitude, longitude, deviceId, serialNumber];
 }
 
 class AttendanceScanResponse extends Equatable {
@@ -60,25 +69,66 @@ class AttendanceScanResponse extends Equatable {
     required this.valid,
     this.message,
     this.officeZone,
+    this.isVirtual = false,
+    this.requiresMatricule = false,
+    this.requiresEmail = false,
+    this.requiresOtp = false,
+    this.authMode,
+    this.agenceNom,
   });
 
   final bool valid;
   final String? message;
   final OfficeZone? officeZone;
+  final bool isVirtual;
+  final bool requiresMatricule;
+  final bool requiresEmail;
+  final bool requiresOtp;
+  final String? authMode;
+  final String? agenceNom;
 
   factory AttendanceScanResponse.fromJson(Map<String, dynamic> json) {
     final zoneRaw = json['office_zone'] ?? json['officeZone'];
+    final agenceRaw = json['agence'];
+    final agence = agenceRaw is Map ? Map<String, dynamic>.from(agenceRaw) : null;
+    final isVirtual = json['is_virtual'] == true ||
+        json['isVirtual'] == true ||
+        agence?['is_virtual'] == true;
+    final authMode =
+        json['auth_mode']?.toString() ?? json['authMode']?.toString();
+    final requiresEmail = json['requires_email'] == true ||
+        json['requiresEmail'] == true ||
+        authMode == 'email_otp' ||
+        isVirtual;
     return AttendanceScanResponse(
       valid: json['valid'] == true,
       message: json['message']?.toString(),
       officeZone: zoneRaw is Map
           ? OfficeZone.fromJson(Map<String, dynamic>.from(zoneRaw))
           : null,
+      isVirtual: isVirtual,
+      requiresMatricule: false,
+      requiresEmail: requiresEmail,
+      requiresOtp: json['requires_otp'] == true ||
+          json['requiresOtp'] == true ||
+          requiresEmail,
+      authMode: authMode,
+      agenceNom: agence?['nom']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props => [valid, message, officeZone];
+  List<Object?> get props => [
+        valid,
+        message,
+        officeZone,
+        isVirtual,
+        requiresMatricule,
+        requiresEmail,
+        requiresOtp,
+        authMode,
+        agenceNom,
+      ];
 }
 
 class AttendanceSubmitRequest extends Equatable {
@@ -90,6 +140,9 @@ class AttendanceSubmitRequest extends Equatable {
     required this.type,
     this.deviceId,
     this.serialNumber,
+    this.matricule,
+    this.email,
+    this.otpCode,
   });
 
   final String qrPayload;
@@ -100,6 +153,9 @@ class AttendanceSubmitRequest extends Equatable {
   final String type;
   final String? deviceId;
   final String? serialNumber;
+  final String? matricule;
+  final String? email;
+  final String? otpCode;
 
   Map<String, dynamic> toJson() => {
         'qr_payload': qrPayload,
@@ -111,6 +167,11 @@ class AttendanceSubmitRequest extends Equatable {
           'device_id': deviceId!.trim(),
         if (serialNumber != null && serialNumber!.trim().isNotEmpty)
           'serial_number': serialNumber!.trim(),
+        if (matricule != null && matricule!.trim().isNotEmpty)
+          'matricule': matricule!.trim(),
+        if (email != null && email!.trim().isNotEmpty) 'email': email!.trim(),
+        if (otpCode != null && otpCode!.trim().isNotEmpty)
+          'otp_code': otpCode!.trim(),
       };
 
   @override
@@ -122,7 +183,66 @@ class AttendanceSubmitRequest extends Equatable {
         type,
         deviceId,
         serialNumber,
+        matricule,
+        email,
+        otpCode,
       ];
+}
+
+class VirtualOtpRequest extends Equatable {
+  const VirtualOtpRequest({
+    required this.qrPayload,
+    required this.email,
+    this.latitude,
+    this.longitude,
+    this.deviceId,
+    this.serialNumber,
+  });
+
+  final String qrPayload;
+  final String email;
+  final double? latitude;
+  final double? longitude;
+  final String? deviceId;
+  final String? serialNumber;
+
+  Map<String, dynamic> toJson() => {
+        'qr_payload': qrPayload,
+        'email': email.trim(),
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (deviceId != null && deviceId!.trim().isNotEmpty)
+          'device_id': deviceId!.trim(),
+        if (serialNumber != null && serialNumber!.trim().isNotEmpty)
+          'serial_number': serialNumber!.trim(),
+      };
+
+  @override
+  List<Object?> get props =>
+      [qrPayload, email, latitude, longitude, deviceId, serialNumber];
+}
+
+class VirtualOtpResponse extends Equatable {
+  const VirtualOtpResponse({
+    required this.ok,
+    this.message,
+    this.email,
+  });
+
+  final bool ok;
+  final String? message;
+  final String? email;
+
+  factory VirtualOtpResponse.fromJson(Map<String, dynamic> json) {
+    return VirtualOtpResponse(
+      ok: json['ok'] == true,
+      message: json['message']?.toString(),
+      email: json['email']?.toString(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [ok, message, email];
 }
 
 class AttendanceSubmitResponse extends Equatable {

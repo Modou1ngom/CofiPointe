@@ -63,6 +63,9 @@ class PendingAttendancePayload {
     this.scanValidated = false,
     this.scanLatitude,
     this.scanLongitude,
+    this.isVirtual = false,
+    this.requiresMatricule = false,
+    this.agenceNom,
   });
 
   final String qrPayload;
@@ -74,6 +77,9 @@ class PendingAttendancePayload {
   /// Position utilisée lors de la validation scan (évite un 2e fix GPS).
   final double? scanLatitude;
   final double? scanLongitude;
+  final bool isVirtual;
+  final bool requiresMatricule;
+  final String? agenceNom;
 }
 
 final pendingAttendanceProvider =

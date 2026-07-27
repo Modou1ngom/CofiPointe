@@ -14,8 +14,11 @@ import '../../../../features/attendance/data/models/pointage_mobile_models.dart'
 import '../../../../providers/app_providers.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
+import '../../../../services/device_info_service.dart';
+import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import 'biometric_validate_screen.dart';
+import 'matricule_validate_screen.dart';
 
 class QrScannerScreen extends ConsumerStatefulWidget {
   const QrScannerScreen({super.key});
@@ -143,12 +146,22 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
       final gps = ref.read(gpsVerificationServiceProvider);
       final pos = await gps.getCurrentPosition();
 
+      var deviceId =
+          await ref.read(secureStorageServiceProvider).readDeviceId();
+      final deviceInfo = await DeviceInfoService().collect();
+      if (deviceId == null || deviceId.trim().isEmpty || deviceId == 'unknown') {
+        deviceId = deviceInfo.deviceId;
+        await ref.read(secureStorageServiceProvider).writeDeviceId(deviceId);
+      }
+
       final remote = ref.read(attendanceRemoteDataSourceProvider);
       final scan = await remote.validateScan(
         AttendanceScanRequest(
           qrPayload: qrPayload,
           latitude: pos.latitude,
           longitude: pos.longitude,
+          deviceId: deviceId,
+          serialNumber: deviceInfo.serialNumber,
         ),
       );
 
@@ -164,10 +177,17 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         scanValidated: true,
         scanLatitude: pos.latitude,
         scanLongitude: pos.longitude,
+        isVirtual: scan.isVirtual,
+        requiresMatricule: scan.requiresMatricule,
+        agenceNom: scan.agenceNom,
       );
 
       if (!mounted) return;
-      await context.push(BiometricValidateScreen.routePath);
+      if (scan.requiresEmail || scan.isVirtual) {
+        await context.push(MatriculeValidateScreen.routePath);
+      } else {
+        await context.push(BiometricValidateScreen.routePath);
+      }
     } on Failure catch (e) {
       if (mounted) {
         showAppToast(context, e.message, type: ToastType.error);

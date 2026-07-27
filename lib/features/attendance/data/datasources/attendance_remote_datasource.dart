@@ -53,6 +53,30 @@ class AttendanceRemoteDataSource {
   Future<AttendanceSubmitResponse> checkOut(AttendanceSubmitRequest body) =>
       _submit(ApiEndpoints.checkOut, body);
 
+  Future<VirtualOtpResponse> requestVirtualOtp(VirtualOtpRequest body) async {
+    if (useTestData) {
+      await TestFixtures.simulateNetworkDelay();
+      return VirtualOtpResponse(
+        ok: true,
+        message: 'Code OTP test envoyé',
+        email: body.email,
+      );
+    }
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        ApiEndpoints.virtualRequestOtp,
+        data: body.toJson(),
+      );
+      final data = res.data;
+      if (data == null) {
+        throw Exception('Réponse vide');
+      }
+      return VirtualOtpResponse.fromJson(data);
+    } catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
   Future<AttendanceSubmitResponse> _submit(
     String path,
     AttendanceSubmitRequest body,
