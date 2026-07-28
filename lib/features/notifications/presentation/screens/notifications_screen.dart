@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
+import '../widgets/notification_tile.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -14,17 +15,20 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(notificationsListProvider);
-    final df = DateFormat('dd/MM/yyyy HH:mm');
 
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(title: const Text('Notifications')),
       body: async.when(
         loading: () => ListView.builder(
           itemCount: 6,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           itemBuilder: (_, __) => const Padding(
-            padding: EdgeInsets.only(bottom: AppSpacing.sm),
-            child: AppSkeleton(height: 72),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 8,
+            ),
+            child: AppSkeleton(height: 56),
           ),
         ),
         error: (e, _) => Center(child: Text('Erreur : $e')),
@@ -65,37 +69,16 @@ class NotificationsScreen extends ConsumerWidget {
               ref.invalidate(notificationsListProvider);
             },
             child: ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              physics: const AlwaysScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (_, i) {
-                final n = items[i];
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer,
-                      child: Icon(
-                        Icons.campaign_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    title: Text(
-                      n.title,
-                      style: TextStyle(
-                        fontWeight: n.read ? FontWeight.w500 : FontWeight.w700,
-                      ),
-                    ),
-                    subtitle: Text(n.body),
-                    trailing: Text(
-                      df.format(n.createdAt),
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
-                );
-              },
+              separatorBuilder: (_, __) => const Divider(
+                height: 1,
+                thickness: 1,
+                indent: AppSpacing.md + 38 + 12,
+                endIndent: AppSpacing.md,
+                color: AppColors.outlineLight,
+              ),
+              itemBuilder: (_, i) => NotificationTile(item: items[i]),
             ),
           );
         },

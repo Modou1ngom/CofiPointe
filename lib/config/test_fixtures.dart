@@ -86,16 +86,22 @@ abstract final class TestFixtures {
     return [
       NotificationItem(
         id: 'test-notification-1',
-        title: 'Bienvenue sur COFINA Pointage',
-        body: 'Votre compte de démonstration est prêt.',
+        title: 'Arrivée enregistrée',
+        body: 'Heure réelle · 08:05',
         createdAt: now.subtract(const Duration(minutes: 15)),
+        punchKind: NotificationPunchKind.arrival,
+        adjusted: false,
+        clockTime: '08:05',
       ),
       NotificationItem(
         id: 'test-notification-2',
-        title: 'Rappel de pointage',
-        body: 'N’oubliez pas de scanner le QR code à l’entrée.',
+        title: 'Départ enregistré',
+        body: 'Heure ajustée · 17:00',
         createdAt: now.subtract(const Duration(hours: 2)),
         read: true,
+        punchKind: NotificationPunchKind.departure,
+        adjusted: true,
+        clockTime: '17:00',
       ),
     ];
   }
