@@ -10,6 +10,7 @@ import '../features/auth/data/repositories/auth_repository.dart';
 import '../features/notifications/data/datasources/notifications_remote_datasource.dart';
 import '../features/profile/data/datasources/profile_remote_datasource.dart';
 import '../services/biometric_service.dart';
+import '../services/face_recognition_service.dart';
 import '../services/gps_verification_service.dart';
 import '../services/offline_sync_service.dart';
 import '../services/secure_storage_service.dart';
@@ -69,6 +70,10 @@ final notificationsRemoteDataSourceProvider =
 
 final biometricServiceProvider = Provider<BiometricService>((ref) {
   return BiometricService();
+});
+
+final faceRecognitionServiceProvider = Provider<FaceRecognitionService>((ref) {
+  return FaceRecognitionService(ref.watch(secureStorageServiceProvider));
 });
 
 final gpsVerificationServiceProvider =

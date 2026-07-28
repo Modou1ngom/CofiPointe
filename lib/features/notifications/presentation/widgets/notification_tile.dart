@@ -1,31 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../data/models/notification_model.dart';
 
-/// Palette écran notifications (alignée sur la maquette sombre).
+/// Palette écran notifications (fond clair de l’app).
 abstract final class _NotifColors {
-  static const background = Color(0xFF1C1C1E);
-  static const surface = Color(0xFF1C1C1E);
-  static const title = Color(0xFFFFFFFF);
-  static const secondary = Color(0xFF8E8E93);
-  static const divider = Color(0xFF2C2C2E);
+  static const background = AppColors.surfaceLight;
+  static const surface = AppColors.surfaceLight;
+  static const title = AppColors.textPrimaryLight;
+  static const secondary = AppColors.textSecondaryLight;
+  static const divider = AppColors.outlineLight;
 
-  static const arrivalBg = Color(0xFF1E3A2A);
-  static const arrivalFg = Color(0xFF30D158);
+  static const arrivalBg = Color(0xFFE8F8EE);
+  static const arrivalFg = Color(0xFF0F9D58);
 
-  static const departureBg = Color(0xFF1A2F4A);
-  static const departureFg = Color(0xFF64D2FF);
+  static const departureBg = Color(0xFFE8F1FB);
+  static const departureFg = Color(0xFF2F6FED);
 
-  static const adjustedBg = Color(0xFF3A2A12);
-  static const adjustedFg = Color(0xFFFF9F0A);
+  static const adjustedBg = Color(0xFFFFF3E0);
+  static const adjustedFg = Color(0xFFE65100);
 
-  static const otherBg = Color(0xFF2C2C2E);
-  static const otherFg = Color(0xFFAEAEB2);
+  static const otherBg = Color(0xFFF2F2F7);
+  static const otherFg = Color(0xFF8E8E93);
 }
 
-/// Ligne de notification — maquette : icône ronde + titre/heure + sous-titre.
+/// Ligne de notification — icône ronde + titre/heure + sous-titre.
 class NotificationTile extends StatelessWidget {
   const NotificationTile({
     super.key,
@@ -174,5 +175,5 @@ abstract final class NotificationScreenStyle {
   static const secondary = _NotifColors.secondary;
   static const title = _NotifColors.title;
 
-  static const systemOverlay = SystemUiOverlayStyle.light;
+  static const systemOverlay = SystemUiOverlayStyle.dark;
 }

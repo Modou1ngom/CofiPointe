@@ -16,6 +16,8 @@ class SecureStorageService {
   static const _deviceRegistered = 'device_registered';
   static const _biometricEnabled = 'biometric_enabled';
   static const _biometricOnboardingDone = 'biometric_onboarding_done';
+  static const _biometricMode = 'biometric_mode';
+  static const _faceTemplate = 'face_template_v1';
 
   final FlutterSecureStorage _storage;
 
@@ -49,6 +51,15 @@ class SecureStorageService {
   Future<bool> readBiometricOnboardingDone() async =>
       (await _storage.read(key: _biometricOnboardingDone)) == 'true';
 
+  /// `fingerprint` | `face_custom`
+  Future<void> writeBiometricMode(String? value) =>
+      _write(_biometricMode, value);
+  Future<String?> readBiometricMode() => _storage.read(key: _biometricMode);
+
+  Future<void> writeFaceTemplate(String? value) =>
+      _write(_faceTemplate, value);
+  Future<String?> readFaceTemplate() => _storage.read(key: _faceTemplate);
+
   Future<void> clearSession() async {
     await _storage.delete(key: _accessToken);
     await _storage.delete(key: _refreshToken);
@@ -57,6 +68,8 @@ class SecureStorageService {
     await _storage.delete(key: _deviceRegistered);
     await _storage.delete(key: _biometricEnabled);
     await _storage.delete(key: _biometricOnboardingDone);
+    await _storage.delete(key: _biometricMode);
+    await _storage.delete(key: _faceTemplate);
   }
 
   Future<void> clearAll() async {

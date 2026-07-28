@@ -9,7 +9,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>CofiPointe</string>
 	<key>NSCameraUsageDescription</key>
-	<string>CofiPointe a besoin de la caméra pour scanner les QR codes de pointage.</string>
+	<string>CofiPointe a besoin de la caméra pour scanner les QR codes et pour la reconnaissance faciale du pointage.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>CofiPointe utilise Face ID pour sécuriser le pointage.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
@@ -81,8 +82,8 @@ class NotificationsScreen extends ConsumerWidget {
               );
             }
             return RefreshIndicator(
-              color: NotificationScreenStyle.title,
-              backgroundColor: const Color(0xFF2C2C2E),
+              color: AppColors.primary,
+              backgroundColor: NotificationScreenStyle.surface,
               onRefresh: () async {
                 ref.invalidate(notificationsListProvider);
               },

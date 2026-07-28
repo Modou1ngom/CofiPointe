@@ -81,9 +81,9 @@ class NotificationItem extends Equatable {
   }
 
   NotificationPresentation get presentation {
-    final kind = punchKind ?? _kindFromTitle(title);
-    final isAdjusted = adjusted ?? _adjustedFromBody(body);
     final time = _resolveTimeLabel(clockTime, body, createdAt);
+    final kind = _resolveKind(punchKind, title, body, time, createdAt);
+    final isAdjusted = adjusted ?? _adjustedFromBody(body);
     final date = _relativeDateLabel(createdAt);
     final shortTitle = switch (kind) {
       NotificationPunchKind.arrival => 'Arrivée enregistrée',
@@ -105,9 +105,33 @@ class NotificationItem extends Equatable {
     );
   }
 
+  /// Résout arrivée/départ même pour les anciens titres « Pointage enregistré ».
+  static NotificationPunchKind _resolveKind(
+    NotificationPunchKind? explicit,
+    String title,
+    String body,
+    String timeLabel,
+    DateTime createdAt,
+  ) {
+    if (explicit == NotificationPunchKind.arrival ||
+        explicit == NotificationPunchKind.departure) {
+      return explicit!;
+    }
+
+    final fromText = _kindFromText('$title $body');
+    if (fromText != NotificationPunchKind.other) return fromText;
+
+    if (_looksLikePunch(title, body)) {
+      return _kindFromClockHour(timeLabel, createdAt);
+    }
+
+    return NotificationPunchKind.other;
+  }
+
   static NotificationPunchKind? _parseKind(dynamic raw) {
     if (raw == null) return null;
     final t = raw.toString().trim().toLowerCase();
+    if (t.isEmpty || t == 'other' || t == 'unknown') return null;
     if (t.contains('arriv') || t == 'arrivee' || t == 'checkin' || t == 'entree') {
       return NotificationPunchKind.arrival;
     }
@@ -117,7 +141,8 @@ class NotificationItem extends Equatable {
         t == 'sortie') {
       return NotificationPunchKind.departure;
     }
-    return NotificationPunchKind.other;
+    // Ne pas figer « other » : laisser _resolveKind inférer.
+    return null;
   }
 
   static bool? _parseBool(dynamic raw) {
@@ -129,13 +154,41 @@ class NotificationItem extends Equatable {
     return null;
   }
 
-  static NotificationPunchKind _kindFromTitle(String title) {
-    final t = title.toLowerCase();
+  static NotificationPunchKind _kindFromText(String text) {
+    final t = text.toLowerCase();
     if (t.contains('arriv')) return NotificationPunchKind.arrival;
-    if (t.contains('départ') || t.contains('depart')) {
+    if (t.contains('départ') || t.contains('depart') || t.contains('sortie')) {
       return NotificationPunchKind.departure;
     }
+    if (t.contains('entr') && !t.contains('enregistr')) {
+      return NotificationPunchKind.arrival;
+    }
     return NotificationPunchKind.other;
+  }
+
+  static bool _looksLikePunch(String title, String body) {
+    final t = '${title.toLowerCase()} ${body.toLowerCase()}';
+    return t.contains('pointage') ||
+        t.contains('arriv') ||
+        t.contains('départ') ||
+        t.contains('depart') ||
+        t.contains('heure réelle') ||
+        t.contains('heure reelle') ||
+        t.contains('heure ajust');
+  }
+
+  /// Heuristique pour titres génériques : matin → arrivée, après-midi → départ.
+  static NotificationPunchKind _kindFromClockHour(
+    String timeLabel,
+    DateTime createdAt,
+  ) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(timeLabel.trim());
+    final hour = match != null
+        ? int.tryParse(match.group(1)!) ?? createdAt.toLocal().hour
+        : createdAt.toLocal().hour;
+    return hour < 13
+        ? NotificationPunchKind.arrival
+        : NotificationPunchKind.departure;
   }
 
   static bool _adjustedFromBody(String body) {
