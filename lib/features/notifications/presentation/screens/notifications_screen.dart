@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
@@ -16,72 +15,92 @@ class NotificationsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(notificationsListProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(title: const Text('Notifications')),
-      body: async.when(
-        loading: () => ListView.builder(
-          itemCount: 6,
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          itemBuilder: (_, __) => const Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 8,
-            ),
-            child: AppSkeleton(height: 56),
-          ),
+    return AnnotatedRegion(
+      value: NotificationScreenStyle.systemOverlay,
+      child: Scaffold(
+        backgroundColor: NotificationScreenStyle.background,
+        appBar: AppBar(
+          title: const Text('Notifications'),
+          backgroundColor: NotificationScreenStyle.background,
+          foregroundColor: NotificationScreenStyle.title,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
-        error: (e, _) => Center(child: Text('Erreur : $e')),
-        data: (items) {
-          if (items.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.notifications_off_outlined,
-                      size: 56,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Aucune notification',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Les alertes RH et sécurité apparaîtront ici.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
+        body: async.when(
+          loading: () => ListView.builder(
+            itemCount: 6,
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            itemBuilder: (_, __) => const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 10,
+              ),
+              child: AppSkeleton(height: 52, radius: 8),
+            ),
+          ),
+          error: (e, _) => Center(
+            child: Text(
+              'Erreur : $e',
+              style: const TextStyle(color: NotificationScreenStyle.secondary),
+            ),
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.notifications_off_outlined,
+                        size: 56,
+                        color: NotificationScreenStyle.secondary,
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Aucune notification',
+                        style: TextStyle(
+                          color: NotificationScreenStyle.title,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Les alertes RH et sécurité apparaîtront ici.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: NotificationScreenStyle.secondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              );
+            }
+            return RefreshIndicator(
+              color: NotificationScreenStyle.title,
+              backgroundColor: const Color(0xFF2C2C2E),
+              onRefresh: () async {
+                ref.invalidate(notificationsListProvider);
+              },
+              child: ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  indent: AppSpacing.md + 38 + 12,
+                  endIndent: AppSpacing.md,
+                  color: NotificationScreenStyle.divider,
+                ),
+                itemBuilder: (_, i) => NotificationTile(item: items[i]),
               ),
             );
-          }
-          return RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(notificationsListProvider);
-            },
-            child: ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                thickness: 1,
-                indent: AppSpacing.md + 38 + 12,
-                endIndent: AppSpacing.md,
-                color: AppColors.outlineLight,
-              ),
-              itemBuilder: (_, i) => NotificationTile(item: items[i]),
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }
