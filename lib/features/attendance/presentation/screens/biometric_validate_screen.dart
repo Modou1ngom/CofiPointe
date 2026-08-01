@@ -69,16 +69,10 @@ class _BiometricValidateScreenState
       final bio = ref.read(biometricServiceProvider);
       final nonce = await bio.createNonce();
 
-      // Empreinte appareil pour le blocage multi-comptes (même jour) côté Laravel.
-      var deviceId =
-          await ref.read(secureStorageServiceProvider).readDeviceId();
-      String? serialNumber;
-      final deviceInfo = await DeviceInfoService().collect();
-      if (deviceId == null || deviceId.trim().isEmpty || deviceId == 'unknown') {
-        deviceId = deviceInfo.deviceId;
-        await ref.read(secureStorageServiceProvider).writeDeviceId(deviceId);
-      }
-      serialNumber = deviceInfo.serialNumber;
+      // Empreinte appareil unique (ANDROID_ID) — jamais Build.ID firmware.
+      final device = await DeviceInfoService().resolveAndPersist(
+        ref.read(secureStorageServiceProvider).writeDeviceId,
+      );
 
       final body = AttendanceSubmitRequest(
         qrPayload: pending.qrPayload,
@@ -86,8 +80,8 @@ class _BiometricValidateScreenState
         longitude: longitude,
         biometricNonce: nonce,
         type: effectiveType,
-        deviceId: deviceId,
-        serialNumber: serialNumber,
+        deviceId: device.deviceId,
+        serialNumber: device.serialNumber,
       );
 
       final remote = ref.read(attendanceRemoteDataSourceProvider);

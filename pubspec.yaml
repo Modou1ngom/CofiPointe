@@ -1,7 +1,7 @@
 name: cofi_pointe
 description: CofiPointe — Pointage biométrique entreprise (Clean Architecture).
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -29,6 +29,7 @@ dependencies:
   shimmer: ^3.0.0
   equatable: ^2.0.7
   device_info_plus: ^11.2.0
+  android_id: ^0.4.0
   package_info_plus: ^8.1.2
   shared_preferences: ^2.3.3
   encrypt: ^5.0.3

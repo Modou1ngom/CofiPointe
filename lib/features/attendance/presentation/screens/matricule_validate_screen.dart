@@ -96,13 +96,9 @@ class _MatriculeValidateScreenState
         longitude = null;
       }
 
-      var deviceId =
-          await ref.read(secureStorageServiceProvider).readDeviceId();
-      final deviceInfo = await DeviceInfoService().collect();
-      if (deviceId == null || deviceId.trim().isEmpty || deviceId == 'unknown') {
-        deviceId = deviceInfo.deviceId;
-        await ref.read(secureStorageServiceProvider).writeDeviceId(deviceId);
-      }
+      final device = await DeviceInfoService().resolveAndPersist(
+        ref.read(secureStorageServiceProvider).writeDeviceId,
+      );
 
       final remote = ref.read(attendanceRemoteDataSourceProvider);
       final res = await remote.requestVirtualOtp(
@@ -111,8 +107,8 @@ class _MatriculeValidateScreenState
           email: email,
           latitude: latitude,
           longitude: longitude,
-          deviceId: deviceId,
-          serialNumber: deviceInfo.serialNumber,
+          deviceId: device.deviceId,
+          serialNumber: device.serialNumber,
         ),
       );
 
@@ -181,15 +177,9 @@ class _MatriculeValidateScreenState
         longitude = pos.longitude;
       }
 
-      var deviceId =
-          await ref.read(secureStorageServiceProvider).readDeviceId();
-      String? serialNumber;
-      final deviceInfo = await DeviceInfoService().collect();
-      if (deviceId == null || deviceId.trim().isEmpty || deviceId == 'unknown') {
-        deviceId = deviceInfo.deviceId;
-        await ref.read(secureStorageServiceProvider).writeDeviceId(deviceId);
-      }
-      serialNumber = deviceInfo.serialNumber;
+      final device = await DeviceInfoService().resolveAndPersist(
+        ref.read(secureStorageServiceProvider).writeDeviceId,
+      );
 
       final remote = ref.read(attendanceRemoteDataSourceProvider);
       final body = AttendanceSubmitRequest(
@@ -198,8 +188,8 @@ class _MatriculeValidateScreenState
         longitude: longitude,
         biometricNonce: 'email_otp:$email',
         type: effectiveType,
-        deviceId: deviceId,
-        serialNumber: serialNumber,
+        deviceId: device.deviceId,
+        serialNumber: device.serialNumber,
         email: email,
         otpCode: _otpCode,
       );
