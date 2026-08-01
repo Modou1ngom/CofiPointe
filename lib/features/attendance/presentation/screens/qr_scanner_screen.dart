@@ -17,6 +17,7 @@ import '../../../../providers/app_providers.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
 import '../../../../services/device_info_service.dart';
+import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import 'biometric_validate_screen.dart';
 import 'matricule_validate_screen.dart';
