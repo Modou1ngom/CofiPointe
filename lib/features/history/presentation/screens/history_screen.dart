@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../features/attendance/data/models/attendance_models.dart';
+import '../../../../features/declarations/presentation/screens/declarations_screen.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
 
@@ -75,17 +78,36 @@ class HistoryScreen extends ConsumerWidget {
                             const SizedBox(height: AppSpacing.sm),
                         itemBuilder: (_, i) {
                           final r = records[i];
+                          final missingEntry = r.checkIn == null;
+                          final missingExit = r.checkOut == null;
+                          final canRegulate = missingEntry || missingExit;
+
                           return Card(
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.md),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    dayFmt.format(r.date),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          dayFmt.format(r.date),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (canRegulate)
+                                        _RegulateButton(
+                                          onPressed: () => _openRegulation(
+                                            context,
+                                            r,
+                                            missingEntry: missingEntry,
+                                            missingExit: missingExit,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
                                   Row(
@@ -121,6 +143,36 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
+  void _openRegulation(
+    BuildContext context,
+    AttendanceRecord r, {
+    required bool missingEntry,
+    required bool missingExit,
+  }) {
+    String? manquant;
+    if (missingEntry && !missingExit) {
+      manquant = 'entree';
+    } else if (missingExit && !missingEntry) {
+      manquant = 'sortie';
+    }
+
+    final date =
+        '${r.date.year.toString().padLeft(4, '0')}-${r.date.month.toString().padLeft(2, '0')}-${r.date.day.toString().padLeft(2, '0')}';
+
+    final params = <String, String>{
+      'type': 'regularisation',
+      'date': date,
+      'mode': 'non_pointage',
+    };
+    if (manquant != null) {
+      params['manquant'] = manquant;
+    }
+
+    context.push(
+      Uri(path: DeclarationsScreen.routePath, queryParameters: params).toString(),
+    );
+  }
+
   Widget _pill(BuildContext context, String label, String time) {
     return Expanded(
       child: Container(
@@ -147,6 +199,38 @@ class HistoryScreen extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RegulateButton extends StatelessWidget {
+  const _RegulateButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onPressed,
+        child: const SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: Text(
+              'R',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+          ),
         ),
       ),
     );

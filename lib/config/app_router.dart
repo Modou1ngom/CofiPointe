@@ -144,7 +144,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: DeclarationsScreen.routePath,
-        builder: (_, __) => const DeclarationsScreen(),
+        builder: (context, state) {
+          final q = state.uri.queryParameters;
+          DateTime? initialDate;
+          final dateStr = q['date'];
+          if (dateStr != null && dateStr.length >= 10) {
+            initialDate = DateTime.tryParse(dateStr.substring(0, 10));
+          }
+          return DeclarationsScreen(
+            initialType: q['type'],
+            initialDate: initialDate,
+            nonPointageMode: q['mode'] == 'non_pointage',
+            pointageManquant: q['manquant'],
+          );
+        },
       ),
       GoRoute(
         path: SuccessScreen.routePath,
