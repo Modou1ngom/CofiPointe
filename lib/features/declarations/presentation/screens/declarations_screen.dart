@@ -48,7 +48,7 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   final _lieuCtrl = TextEditingController();
   final _imagePicker = ImagePicker();
 
-  String _type = 'absence';
+  String _type = 'retard';
   DateTime _dateDebut = DateTime.now();
   DateTime? _dateFin;
   TimeOfDay? _heureDebut;
@@ -58,8 +58,9 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   String? _pointageManquant;
   late final bool _nonPointageMode;
 
-  /// Types visibles pour une nouvelle déclaration (sans Retard ni Régularisation).
+  /// Types du formulaire (Régularisation = flux non-pointage uniquement).
   static const _fallbackTypes = [
+    {'value': 'retard', 'label': 'Retard'},
     {'value': 'absence', 'label': 'Absence'},
     {'value': 'conge_annuel', 'label': 'Congé annuel'},
     {'value': 'conge_maladie', 'label': 'Congé maladie'},
@@ -81,8 +82,9 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       }.contains(_type);
 
   bool get _needsHeures =>
-      _nonPointageMode &&
-      (_pointageManquant == 'entree' || _pointageManquant == 'sortie');
+      (!_nonPointageMode && _type == 'retard') ||
+      (_nonPointageMode &&
+          (_pointageManquant == 'entree' || _pointageManquant == 'sortie'));
 
   bool get _needsLieu => !_nonPointageMode && _type == 'mission';
 
@@ -103,11 +105,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
     }
     if (widget.initialType != null && widget.initialType!.isNotEmpty) {
       final t = widget.initialType!;
-      // Anciens types API → nouveaux libellés.
       _type = switch (t) {
-        'retard' => 'mission',
         'conge' => 'conge_annuel',
-        'regularisation' => 'absence',
         _ => t,
       };
     }
@@ -270,6 +269,14 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
     }
     if (_needsDateRange && _dateFin == null) {
       showAppToast(context, 'La date de fin est obligatoire.', type: ToastType.error);
+      return;
+    }
+    if (_type == 'retard' && (_heureDebut == null || _heureFin == null)) {
+      showAppToast(
+        context,
+        'Heure début et fin obligatoires pour un retard.',
+        type: ToastType.error,
+      );
       return;
     }
     if (_nonPointageMode && _pointageManquant == 'entree' && _heureDebut == null) {
@@ -451,6 +458,22 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () => _pickDate(fin: true),
                     ),
+                  if (_type == 'retard' && !_nonPointageMode) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Heure début *'),
+                      subtitle: Text(_heureDebut == null ? 'Choisir…' : _fmtTime(_heureDebut!)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () => _pickTime(fin: false),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Heure fin *'),
+                      subtitle: Text(_heureFin == null ? 'Choisir…' : _fmtTime(_heureFin!)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () => _pickTime(fin: true),
+                    ),
+                  ],
                   if (_nonPointageMode && _pointageManquant == 'entree')
                     ListTile(
                       contentPadding: EdgeInsets.zero,
