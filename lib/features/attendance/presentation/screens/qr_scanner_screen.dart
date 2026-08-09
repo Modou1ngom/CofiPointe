@@ -35,11 +35,19 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   late final MobileScannerController _controller = MobileScannerController(
     // Sur web / PC : pas de caméra arrière → démarrage manuel + facing adapté.
     autoStart: false,
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    // Analyse chaque frame sans délai entre détections.
+    detectionSpeed: DetectionSpeed.unrestricted,
     facing: kIsWeb ? CameraFacing.front : CameraFacing.back,
     torchEnabled: false,
     formats: const [BarcodeFormat.qrCode],
+    // Meilleure netteté QR (Android sinon ~640×480).
+    cameraResolution: kIsWeb ? null : const Size(1280, 720),
+    useNewCameraSelector: !kIsWeb,
+    returnImage: false,
   );
+
+  /// Cadre de détection (coordonnées écran) — recalculé au layout.
+  static const double _scanBoxSize = 280;
 
   bool _handled = false;
   bool _validating = false;
@@ -204,6 +212,8 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
       final raw = b.rawValue;
       if (raw != null && raw.isNotEmpty) {
         _handled = true;
+        // Stop immédiat pour figer la détection et libérer le CPU.
+        unawaited(_controller.stop());
         final pending = _inferPayload(raw);
         _validateAndOpenBiometric(
           qrPayload: pending.qrPayload,
@@ -294,7 +304,23 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
           _validating = false;
           _handled = false;
         });
+        // Remettre la caméra pour un nouveau scan (échec ou retour).
+        unawaited(_resumeScanner());
       }
+    }
+  }
+
+  Future<void> _resumeScanner() async {
+    if (!mounted || _starting) return;
+    try {
+      final preferred = kIsWeb ? CameraFacing.front : CameraFacing.back;
+      await _controller.start(cameraDirection: preferred);
+    } catch (_) {
+      try {
+        await _controller.start(
+          cameraDirection: kIsWeb ? CameraFacing.back : CameraFacing.front,
+        );
+      } catch (_) {}
     }
   }
 
@@ -302,158 +328,171 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-            errorBuilder: (context, error, child) {
-              return _CameraFallback(
-                message: error.errorDetails?.message ??
-                    error.errorCode.message,
-                onRetry: _startCamera,
-                onSites: _openSitePicker,
-                onPaste: _pasteQrPayload,
-              );
-            },
-          ),
-          if (_starting)
-            const ColoredBox(
-              color: Colors.black87,
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.white),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final scanWindow = Rect.fromCenter(
+            center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+            width: _scanBoxSize,
+            height: _scanBoxSize,
+          );
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              MobileScanner(
+                controller: _controller,
+                onDetect: _onDetect,
+                scanWindow: scanWindow,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, child) {
+                  return _CameraFallback(
+                    message: error.errorDetails?.message ??
+                        error.errorCode.message,
+                    onRetry: _startCamera,
+                    onSites: _openSitePicker,
+                    onPaste: _pasteQrPayload,
+                  );
+                },
               ),
-            ),
-          if (!_starting && _startError != null)
-            _CameraFallback(
-              message: _startError!,
-              onRetry: _startCamera,
-              onSites: _openSitePicker,
-              onPaste: _pasteQrPayload,
-            ),
-          if (_validating)
-            Container(
-              color: Colors.black54,
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(color: Colors.white),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Vérification GPS du site…',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                        ),
+              if (_starting)
+                const ColoredBox(
+                  color: Colors.black87,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.white),
                   ),
-                ],
-              ),
-            ),
-          if (_startError == null && !_starting)
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 260,
-                height: 260,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white24, width: 2),
-                  borderRadius: BorderRadius.circular(24),
                 ),
-                child: Stack(
-                  children: [
-                    Positioned(left: 0, top: 0, child: _corner()),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Transform.rotate(angle: 1.5708, child: _corner()),
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Transform.rotate(angle: 3.1416, child: _corner()),
-                    ),
-                    Positioned(
-                      left: 0,
-                      bottom: 0,
-                      child:
-                          Transform.rotate(angle: -1.5708, child: _corner()),
-                    ),
-                  ],
+              if (!_starting && _startError != null)
+                _CameraFallback(
+                  message: _startError!,
+                  onRetry: _startCamera,
+                  onSites: _openSitePicker,
+                  onPaste: _pasteQrPayload,
                 ),
-              ),
-            ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 8,
-            left: AppSpacing.md,
-            right: AppSpacing.md,
-            child: Row(
-              children: [
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white24,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _validating ? null : () => context.pop(),
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                const Spacer(),
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white24,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _validating ? null : _pasteQrPayload,
-                  icon: const Icon(Icons.content_paste_rounded),
-                  tooltip: 'Coller le QR',
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white24,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _validating ? null : _openSitePicker,
-                  icon: const Icon(Icons.apartment_rounded),
-                  tooltip: 'Sites (sans QR)',
-                ),
-              ],
-            ),
-          ),
-          if (_startError == null && !_starting)
-            Positioned(
-              bottom: 48,
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
-              child: Column(
-                children: [
-                  Text(
-                    kIsWeb
-                        ? 'Autorisez la webcam, puis placez le QR devant'
-                        : 'Placez le QR code dans le cadre',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          shadows: const [
-                            Shadow(blurRadius: 8, color: Colors.black54),
-                          ],
-                        ),
-                  ),
-                  if (!kIsWeb) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton.filledTonal(
-                        onPressed:
-                            _validating ? null : () => _controller.toggleTorch(),
-                        icon: const Icon(Icons.flashlight_on_outlined),
+              if (_validating)
+                Container(
+                  color: Colors.black54,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: Colors.white),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Vérification GPS du site…',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                            ),
                       ),
+                    ],
+                  ),
+                ),
+              if (_startError == null && !_starting)
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: _scanBoxSize,
+                    height: _scanBoxSize,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white24, width: 2),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned(left: 0, top: 0, child: _corner()),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Transform.rotate(angle: 1.5708, child: _corner()),
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Transform.rotate(angle: 3.1416, child: _corner()),
+                        ),
+                        Positioned(
+                          left: 0,
+                          bottom: 0,
+                          child:
+                              Transform.rotate(angle: -1.5708, child: _corner()),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: AppSpacing.md,
+                right: AppSpacing.md,
+                child: Row(
+                  children: [
+                    IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white24,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _validating ? null : () => context.pop(),
+                      icon: const Icon(Icons.arrow_back),
+                    ),
+                    const Spacer(),
+                    IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white24,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _validating ? null : _pasteQrPayload,
+                      icon: const Icon(Icons.content_paste_rounded),
+                      tooltip: 'Coller le QR',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white24,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _validating ? null : _openSitePicker,
+                      icon: const Icon(Icons.apartment_rounded),
+                      tooltip: 'Sites (sans QR)',
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-        ],
+              if (_startError == null && !_starting)
+                Positioned(
+                  bottom: 48,
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  child: Column(
+                    children: [
+                      Text(
+                        kIsWeb
+                            ? 'Autorisez la webcam, puis placez le QR devant'
+                            : 'Placez le QR code dans le cadre',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              shadows: const [
+                                Shadow(blurRadius: 8, color: Colors.black54),
+                              ],
+                            ),
+                      ),
+                      if (!kIsWeb) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: IconButton.filledTonal(
+                            onPressed: _validating
+                                ? null
+                                : () => _controller.toggleTorch(),
+                            icon: const Icon(Icons.flashlight_on_outlined),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

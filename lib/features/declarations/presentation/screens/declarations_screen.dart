@@ -48,7 +48,7 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   final _lieuCtrl = TextEditingController();
   final _imagePicker = ImagePicker();
 
-  String _type = 'retard';
+  String _type = 'absence';
   DateTime _dateDebut = DateTime.now();
   DateTime? _dateFin;
   TimeOfDay? _heureDebut;
@@ -58,15 +58,14 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   String? _pointageManquant;
   late final bool _nonPointageMode;
 
+  /// Types visibles pour une nouvelle déclaration (sans Retard ni Régularisation).
   static const _fallbackTypes = [
-    {'value': 'retard', 'label': 'Retard'},
     {'value': 'absence', 'label': 'Absence'},
     {'value': 'conge_annuel', 'label': 'Congé annuel'},
     {'value': 'conge_maladie', 'label': 'Congé maladie'},
     {'value': 'permission_exceptionnelle', 'label': 'Permission exceptionnelle'},
     {'value': 'mission', 'label': 'Mission'},
     {'value': 'formation', 'label': 'Formation'},
-    {'value': 'regularisation', 'label': 'Régularisation'},
   ];
 
   bool get _needsDateRange =>
@@ -82,8 +81,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       }.contains(_type);
 
   bool get _needsHeures =>
-      _type == 'retard' ||
-      (_nonPointageMode && (_pointageManquant == 'entree' || _pointageManquant == 'sortie'));
+      _nonPointageMode &&
+      (_pointageManquant == 'entree' || _pointageManquant == 'sortie');
 
   bool get _needsLieu => !_nonPointageMode && _type == 'mission';
 
@@ -103,7 +102,14 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       _dateDebut = widget.initialDate!;
     }
     if (widget.initialType != null && widget.initialType!.isNotEmpty) {
-      _type = widget.initialType!;
+      final t = widget.initialType!;
+      // Anciens types API → nouveaux libellés.
+      _type = switch (t) {
+        'retard' => 'mission',
+        'conge' => 'conge_annuel',
+        'regularisation' => 'absence',
+        _ => t,
+      };
     }
     if (_nonPointageMode) {
       _type = 'regularisation';
@@ -154,7 +160,6 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
         queryParameters: {'mois': mois},
       );
       final data = res.data?['data'];
-      final types = res.data?['types'];
       setState(() {
         _items = data is List
             ? data
@@ -162,12 +167,7 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList()
             : [];
-        _types = types is List
-            ? types
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList()
-            : List<Map<String, dynamic>>.from(_fallbackTypes);
+        _types = List<Map<String, dynamic>>.from(_fallbackTypes);
       });
     } catch (e) {
       setState(() {
@@ -270,10 +270,6 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
     }
     if (_needsDateRange && _dateFin == null) {
       showAppToast(context, 'La date de fin est obligatoire.', type: ToastType.error);
-      return;
-    }
-    if (_type == 'retard' && (_heureDebut == null || _heureFin == null)) {
-      showAppToast(context, 'Heure début et fin obligatoires pour un retard.', type: ToastType.error);
       return;
     }
     if (_nonPointageMode && _pointageManquant == 'entree' && _heureDebut == null) {
@@ -455,22 +451,6 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () => _pickDate(fin: true),
                     ),
-                  if (_type == 'retard') ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Heure début'),
-                      subtitle: Text(_heureDebut == null ? 'Choisir…' : _fmtTime(_heureDebut!)),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () => _pickTime(fin: false),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Heure fin'),
-                      subtitle: Text(_heureFin == null ? 'Choisir…' : _fmtTime(_heureFin!)),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () => _pickTime(fin: true),
-                    ),
-                  ],
                   if (_nonPointageMode && _pointageManquant == 'entree')
                     ListTile(
                       contentPadding: EdgeInsets.zero,
