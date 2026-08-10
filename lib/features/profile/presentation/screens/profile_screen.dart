@@ -10,6 +10,7 @@ import '../../../../providers/theme_mode_provider.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../auth/presentation/screens/biometric_activation_screen.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -56,10 +57,14 @@ class ProfileScreen extends ConsumerWidget {
             error: (_, __) => _AccountDetails(
               user: _mergeUser(session.user, null),
               biometricEnabled: session.biometricEnabled,
+              onConfigureBiometric: () =>
+                  context.push(BiometricActivationScreen.routePath),
             ),
             data: (u) => _AccountDetails(
               user: _mergeUser(session.user, u),
               biometricEnabled: session.biometricEnabled,
+              onConfigureBiometric: () =>
+                  context.push(BiometricActivationScreen.routePath),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -235,10 +240,12 @@ class _AccountDetails extends StatelessWidget {
   const _AccountDetails({
     required this.user,
     required this.biometricEnabled,
+    required this.onConfigureBiometric,
   });
 
   final UserModel user;
   final bool biometricEnabled;
+  final VoidCallback onConfigureBiometric;
 
   String _orDash(String? v) =>
       (v != null && v.trim().isNotEmpty) ? v.trim() : '—';
@@ -273,9 +280,15 @@ class _AccountDetails extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.fingerprint_rounded),
+            leading: const Icon(Icons.face_retouching_natural),
             title: const Text('Biométrie'),
-            subtitle: Text(biometricEnabled ? 'Activée' : 'Désactivée'),
+            subtitle: Text(
+              biometricEnabled
+                  ? 'Activée — appuyez pour reconfigurer'
+                  : 'Désactivée — appuyez pour activer',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: onConfigureBiometric,
           ),
           const Divider(height: 1),
           ListTile(

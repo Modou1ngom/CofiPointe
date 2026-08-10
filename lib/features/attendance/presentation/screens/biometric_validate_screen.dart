@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import '../../../../services/device_info_service.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import '../../../../widgets/buttons/primary_button.dart';
+import '../../../auth/presentation/screens/face_capture_screen.dart';
 
 class BiometricValidateScreen extends ConsumerStatefulWidget {
   const BiometricValidateScreen({super.key});
@@ -29,6 +31,49 @@ class BiometricValidateScreen extends ConsumerStatefulWidget {
 class _BiometricValidateScreenState
     extends ConsumerState<BiometricValidateScreen> {
   bool _busy = false;
+  bool? _useFaceCustom;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMode();
+  }
+
+  Future<void> _loadMode() async {
+    final mode =
+        await ref.read(secureStorageServiceProvider).readBiometricMode();
+    if (!mounted) return;
+    setState(() => _useFaceCustom = mode == 'face_custom');
+  }
+
+  Future<String> _resolveBiometricNonce() async {
+    final storage = ref.read(secureStorageServiceProvider);
+    final mode = await storage.readBiometricMode();
+    final face = ref.read(faceRecognitionServiceProvider);
+
+    if (mode == 'face_custom') {
+      if (kIsWeb) {
+        throw const BiometricFailure(
+          'La reconnaissance faciale custom n’est pas disponible sur le web.',
+        );
+      }
+      if (!await face.hasEnrolledFace()) {
+        throw const BiometricFailure(
+          'Aucun visage enrôlé. Allez dans Profil pour activer la reconnaissance faciale.',
+        );
+      }
+      final path = await context.push<String>(
+        FaceCaptureScreen.routePathVerify,
+      );
+      if (path == null || path.isEmpty) {
+        throw const BiometricFailure('Validation faciale annulée');
+      }
+      return face.verifyFromFile(path);
+    }
+
+    final bio = ref.read(biometricServiceProvider);
+    return bio.createNonce();
+  }
 
   Future<void> _submit() async {
     final pending = ref.read(pendingAttendanceProvider);
@@ -66,8 +111,7 @@ class _BiometricValidateScreenState
         longitude = pos.longitude;
       }
 
-      final bio = ref.read(biometricServiceProvider);
-      final nonce = await bio.createNonce();
+      final nonce = await _resolveBiometricNonce();
 
       // Empreinte appareil unique (ANDROID_ID) — jamais Build.ID firmware.
       final device = await DeviceInfoService().resolveAndPersist(
@@ -159,8 +203,14 @@ class _BiometricValidateScreenState
 
   @override
   Widget build(BuildContext context) {
+    final useFace = _useFaceCustom == true;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Validation biométrique')),
+      appBar: AppBar(
+        title: Text(
+          useFace ? 'Validation faciale' : 'Validation biométrique',
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -173,7 +223,7 @@ class _BiometricValidateScreenState
                 color: AppColors.primary.withValues(alpha: 0.12),
               ),
               child: Icon(
-                Icons.fingerprint,
+                useFace ? Icons.face_retouching_natural : Icons.fingerprint,
                 size: 96,
                 color: Theme.of(context).colorScheme.primary,
               ),
@@ -187,15 +237,27 @@ class _BiometricValidateScreenState
                 ),
             const SizedBox(height: AppSpacing.xl),
             Text(
-              'Touchez le capteur d’empreinte pour valider le pointage',
+              useFace
+                  ? 'Scannez votre visage pour valider le pointage'
+                  : 'Touchez le capteur d’empreinte pour valider le pointage',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
             ),
+            if (useFace) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'La caméra s’ouvrira pour comparer votre visage au modèle enregistré.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
             const Spacer(),
             PrimaryButton(
-              label: 'Valider le pointage',
+              label: useFace ? 'Scanner mon visage' : 'Valider le pointage',
               loading: _busy,
               onPressed: _busy ? null : _submit,
             ),

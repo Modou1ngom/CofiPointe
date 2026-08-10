@@ -136,7 +136,10 @@ class AttendanceRemoteDataSource {
       return TestFixtures.pointageTodaySummary();
     }
     try {
-      final res = await _dio.get<Map<String, dynamic>>(ApiEndpoints.pointageToday);
+      final res = await _dio.get<Map<String, dynamic>>(
+        ApiEndpoints.pointageToday,
+        queryParameters: const {'lite': '1'},
+      );
       final root = res.data;
       if (root == null) return PointageTodaySummary.empty;
       final data = root['data'] ?? root;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -14,7 +15,9 @@ class FaceRecognitionService {
 
   final SecureStorageService _storage;
 
-  static const matchThreshold = 0.88;
+  /// Seuil de similarité cosinus (0–1). Un peu souple pour variations lumière/angle.
+  static const matchThreshold = 0.82;
+
   static const _landmarkTypes = <FaceLandmarkType>[
     FaceLandmarkType.leftEye,
     FaceLandmarkType.rightEye,
@@ -26,6 +29,12 @@ class FaceRecognitionService {
     FaceLandmarkType.rightCheek,
     FaceLandmarkType.leftEar,
     FaceLandmarkType.rightEar,
+  ];
+
+  static const _requiredLandmarks = <FaceLandmarkType>[
+    FaceLandmarkType.leftEye,
+    FaceLandmarkType.rightEye,
+    FaceLandmarkType.noseBase,
   ];
 
   FaceDetector? _detector;
@@ -72,6 +81,7 @@ class FaceRecognitionService {
 
     final face = faces.first;
     _assertFaceQuality(face);
+    _assertRequiredLandmarks(face);
     return embeddingFromFace(face);
   }
 
@@ -88,6 +98,16 @@ class FaceRecognitionService {
       throw const BiometricFailure(
         'Approchez-vous : le visage est trop petit dans le cadre.',
       );
+    }
+  }
+
+  void _assertRequiredLandmarks(Face face) {
+    for (final type in _requiredLandmarks) {
+      if (face.landmarks[type]?.position == null) {
+        throw const BiometricFailure(
+          'Visage mal détecté. Améliorez l’éclairage et recentrez-vous.',
+        );
+      }
     }
   }
 
@@ -116,6 +136,7 @@ class FaceRecognitionService {
   Future<void> enrollFromFile(String imagePath) async {
     final embedding = await extractEmbeddingFromFile(imagePath);
     await _storage.writeFaceTemplate(jsonEncode(embedding));
+    await _storage.writeBiometricMode('face_custom');
   }
 
   /// Compare la photo courante au modèle enrôlé.
@@ -140,6 +161,12 @@ class FaceRecognitionService {
     }
 
     final probe = await extractEmbeddingFromFile(imagePath);
+    if (probe.length != enrolled.length) {
+      throw const BiometricFailure(
+        'Modèle facial incompatible. Réenrôlez votre visage.',
+      );
+    }
+
     final score = cosineSimilarity(enrolled, probe);
     if (score < matchThreshold) {
       throw BiometricFailure(
@@ -147,8 +174,7 @@ class FaceRecognitionService {
       );
     }
 
-    final digest = base64Url.encode(utf8.encode(jsonEncode(probe)))
-        .replaceAll('=', '');
+    final digest = sha256.convert(utf8.encode(jsonEncode(probe))).toString();
     return 'face_custom:$digest:${DateTime.now().millisecondsSinceEpoch}';
   }
 

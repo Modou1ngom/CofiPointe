@@ -13,7 +13,6 @@ import '../services/biometric_service.dart';
 import '../services/face_recognition_service.dart';
 import '../services/gps_verification_service.dart';
 import '../services/offline_sync_service.dart';
-import '../services/secure_storage_service.dart';
 import '../services/session_controller.dart';
 
 /// Réglé dans [main] avec `override`.
@@ -23,10 +22,14 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 
 final envProvider = Provider<EnvConfig>((ref) => EnvConfig.fromEnvironment());
 
-final dioProvider = Provider<Dio>((ref) {
+final dioClientProvider = Provider<DioClient>((ref) {
   final env = ref.watch(envProvider);
   final storage = ref.watch(secureStorageServiceProvider);
-  return DioClient(env: env, secureStorage: storage).build();
+  return DioClient(env: env, secureStorage: storage);
+});
+
+final dioProvider = Provider<Dio>((ref) {
+  return ref.watch(dioClientProvider).build();
 });
 
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/network/dio_interceptor.dart';
 import '../features/auth/data/models/user_model.dart';
 import 'secure_storage_service.dart';
 
@@ -75,6 +76,8 @@ class SessionController extends StateNotifier<SessionState> {
     final deviceOk = await _storage.readDeviceRegistered();
     final bioDone = await _storage.readBiometricOnboardingDone();
 
+    AuthInterceptor.setSharedToken(token);
+
     state = SessionState(
       user: user,
       accessToken: token,
@@ -100,6 +103,7 @@ class SessionController extends StateNotifier<SessionState> {
     await _storage.writeDeviceRegistered(deviceRegistered);
     await _storage.writeBiometricEnabled(biometricEnabled);
     await _storage.writeBiometricOnboardingDone(biometricOnboardingDone);
+    AuthInterceptor.setSharedToken(accessToken);
     state = SessionState(
       user: user,
       accessToken: accessToken,
@@ -130,6 +134,7 @@ class SessionController extends StateNotifier<SessionState> {
 
   Future<void> logout() async {
     await _storage.clearSession();
+    AuthInterceptor.clearSharedToken();
     state = const SessionState();
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../../../../services/session_controller.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
+import 'face_capture_screen.dart';
 
 enum _BioChoice { fingerprint, face }
 
@@ -34,15 +36,34 @@ class _BiometricActivationScreenState
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final bio = ref.read(biometricServiceProvider);
-      await bio.authenticate(
-        localizedReason: _choice == _BioChoice.fingerprint
-            ? 'Activer l’empreinte digitale'
-            : 'Activer la reconnaissance faciale',
-        preferred: _choice == _BioChoice.fingerprint
-            ? BiometricKind.fingerprint
-            : BiometricKind.face,
-      );
+      final storage = ref.read(secureStorageServiceProvider);
+      final face = ref.read(faceRecognitionServiceProvider);
+
+      if (_choice == _BioChoice.face) {
+        if (kIsWeb) {
+          throw const BiometricFailure(
+            'La reconnaissance faciale custom n’est pas disponible sur le web. '
+            'Utilisez l’application Android ou iOS.',
+          );
+        }
+        final path = await context.push<String>(
+          FaceCaptureScreen.routePathEnroll,
+        );
+        if (path == null || path.isEmpty) {
+          return;
+        }
+        await face.enrollFromFile(path);
+        await storage.writeBiometricMode('face_custom');
+      } else {
+        final bio = ref.read(biometricServiceProvider);
+        await bio.authenticate(
+          localizedReason: 'Activer l’empreinte digitale',
+          preferred: BiometricKind.fingerprint,
+        );
+        await face.clearEnrollment();
+        await storage.writeBiometricMode('fingerprint');
+      }
+
       await ref
           .read(sessionControllerProvider.notifier)
           .setBiometricEnabled(true);
@@ -74,6 +95,9 @@ class _BiometricActivationScreenState
   }
 
   Future<void> _skip() async {
+    final storage = ref.read(secureStorageServiceProvider);
+    await ref.read(faceRecognitionServiceProvider).clearEnrollment();
+    await storage.writeBiometricMode(null);
     await ref.read(sessionControllerProvider.notifier).setBiometricEnabled(false);
     await ref.read(sessionControllerProvider.notifier).setBiometricOnboardingDone(true);
     if (!mounted) return;
@@ -195,7 +219,7 @@ class _BiometricActivationScreenState
             card(
               value: _BioChoice.fingerprint,
               title: 'Empreinte digitale',
-              subtitle: 'Rapide et fiable sur la majorité des appareils.',
+              subtitle: 'Rapide et fiable via le capteur de l’appareil.',
               icon: Icons.fingerprint,
               badge: 'Recommandé',
             ),
@@ -203,12 +227,15 @@ class _BiometricActivationScreenState
             card(
               value: _BioChoice.face,
               title: 'Reconnaissance faciale',
-              subtitle: 'Sécurisé et fluide sur appareils compatibles.',
+              subtitle:
+                  'Caméra + analyse du visage (ML Kit). Fonctionne hors Face ID.',
               icon: Icons.face_retouching_natural,
             ),
             const Spacer(),
             PrimaryButton(
-              label: 'Activer maintenant',
+              label: _choice == _BioChoice.face
+                  ? 'Enregistrer mon visage'
+                  : 'Activer maintenant',
               loading: _loading,
               onPressed: _activate,
             ),

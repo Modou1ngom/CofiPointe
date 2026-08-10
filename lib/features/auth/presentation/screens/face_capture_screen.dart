@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/constants/app_colors.dart';
@@ -31,6 +32,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
   CameraController? _controller;
   bool _ready = false;
   bool _busy = false;
+  bool _isFront = true;
   String? _error;
 
   @override
@@ -67,7 +69,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
       );
       final controller = CameraController(
         front,
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -78,6 +80,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
       }
       setState(() {
         _controller = controller;
+        _isFront = front.lensDirection == CameraLensDirection.front;
         _ready = true;
       });
     } catch (e) {
@@ -94,7 +97,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
     try {
       final file = await controller.takePicture();
       if (!mounted) return;
-      Navigator.of(context).pop<String>(file.path);
+      context.pop<String>(file.path);
     } on Failure catch (e) {
       if (mounted) {
         showAppToast(context, e.message, type: ToastType.error);
@@ -124,7 +127,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
         ? 'Enrôlement facial'
         : 'Validation faciale';
     final hint = widget.mode == FaceCaptureMode.enroll
-        ? 'Placez votre visage dans le cadre, regard droit, puis capturez.'
+        ? 'Placez votre visage dans le cadre, regard droit, bonne lumière, puis capturez.'
         : 'Placez votre visage dans le cadre pour valider le pointage.';
 
     return Scaffold(
@@ -166,7 +169,11 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                             : Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  CameraPreview(_controller!),
+                                  // Miroir pour caméra avant (comportement selfie).
+                                  Transform.flip(
+                                    flipX: _isFront,
+                                    child: CameraPreview(_controller!),
+                                  ),
                                   Center(
                                     child: Container(
                                       width: 240,
@@ -194,7 +201,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                 onPressed: (!_ready || _error != null || _busy) ? null : _capture,
               ),
               TextButton(
-                onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                onPressed: _busy ? null : () => context.pop(),
                 child: const Text('Annuler'),
               ),
             ],

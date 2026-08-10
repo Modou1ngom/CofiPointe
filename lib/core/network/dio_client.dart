@@ -3,10 +3,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../config/env.dart';
 import '../../services/secure_storage_service.dart';
-import 'api_exception.dart';
 import 'dio_interceptor.dart';
 
-/// Client HTTP unique — TLS géré par la plateforme ; pinning possible en prod.
+/// Client HTTP unique — timeouts serrés + auth token en cache mémoire.
 class DioClient {
   DioClient({
     required EnvConfig env,
@@ -16,13 +15,18 @@ class DioClient {
 
   final EnvConfig _env;
   final SecureStorageService _secureStorage;
+  AuthInterceptor? _authInterceptor;
+
+  AuthInterceptor? get authInterceptor => _authInterceptor;
 
   Dio build() {
+    _authInterceptor = AuthInterceptor(_secureStorage);
     final dio = Dio(
       BaseOptions(
         baseUrl: _env.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 25),
-        receiveTimeout: const Duration(seconds: 25),
+        connectTimeout: const Duration(seconds: 12),
+        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 20),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -32,12 +36,13 @@ class DioClient {
     );
 
     dio.interceptors.addAll([
-      AuthInterceptor(_secureStorage),
-      LogInterceptor(
-        requestBody: kDebugMode,
-        responseBody: kDebugMode,
-        error: kDebugMode,
-      ),
+      _authInterceptor!,
+      if (kDebugMode)
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          error: true,
+        ),
     ]);
 
     return dio;

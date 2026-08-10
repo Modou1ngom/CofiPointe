@@ -74,15 +74,15 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
         'absence',
         'conge_annuel',
         'conge_maladie',
-        'permission_exceptionnelle',
         'mission',
         'formation',
         'conge',
       }.contains(_type);
 
   bool get _needsHeures =>
-      _nonPointageMode &&
-      (_pointageManquant == 'entree' || _pointageManquant == 'sortie');
+      (!_nonPointageMode && _type == 'permission_exceptionnelle') ||
+      (_nonPointageMode &&
+          (_pointageManquant == 'entree' || _pointageManquant == 'sortie'));
 
   bool get _needsLieu => !_nonPointageMode && _type == 'mission';
 
@@ -216,8 +216,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   Future<void> _takePhoto() async {
     final x = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 1920,
+      imageQuality: 70,
+      maxWidth: 1280,
     );
     if (x == null) return;
     setState(() {
@@ -229,8 +229,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   Future<void> _pickGallery() async {
     final x = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1920,
+      imageQuality: 70,
+      maxWidth: 1280,
     );
     if (x == null) return;
     setState(() {
@@ -268,6 +268,16 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
     }
     if (_needsDateRange && _dateFin == null) {
       showAppToast(context, 'La date de fin est obligatoire.', type: ToastType.error);
+      return;
+    }
+    if (_needsHeures &&
+        !_nonPointageMode &&
+        (_heureDebut == null || _heureFin == null)) {
+      showAppToast(
+        context,
+        'Heure début et fin obligatoires pour une permission exceptionnelle.',
+        type: ToastType.error,
+      );
       return;
     }
     if (_nonPointageMode && _pointageManquant == 'entree' && _heureDebut == null) {
@@ -449,6 +459,22 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () => _pickDate(fin: true),
                     ),
+                  if (_needsHeures && !_nonPointageMode) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Heure début *'),
+                      subtitle: Text(_heureDebut == null ? 'Choisir…' : _fmtTime(_heureDebut!)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () => _pickTime(fin: false),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Heure fin *'),
+                      subtitle: Text(_heureFin == null ? 'Choisir…' : _fmtTime(_heureFin!)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () => _pickTime(fin: true),
+                    ),
+                  ],
                   if (_nonPointageMode && _pointageManquant == 'entree')
                     ListTile(
                       contentPadding: EdgeInsets.zero,

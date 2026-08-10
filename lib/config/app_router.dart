@@ -9,6 +9,7 @@ import '../features/attendance/presentation/screens/success_screen.dart';
 import '../features/declarations/presentation/screens/declarations_screen.dart';
 import '../features/auth/presentation/screens/biometric_activation_screen.dart';
 import '../features/auth/presentation/screens/device_registration_screen.dart';
+import '../features/auth/presentation/screens/face_capture_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/auth/presentation/screens/otp_screen.dart';
 import '../features/auth/presentation/screens/splash_screen.dart';
@@ -56,7 +57,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         if (session.deviceRegistered &&
             !session.biometricOnboardingDone &&
-            path != BiometricActivationScreen.routePath) {
+            path != BiometricActivationScreen.routePath &&
+            path != FaceCaptureScreen.routePathEnroll) {
           return BiometricActivationScreen.routePath;
         }
 
@@ -90,6 +92,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: BiometricActivationScreen.routePath,
         builder: (_, __) => const BiometricActivationScreen(),
+      ),
+      GoRoute(
+        path: FaceCaptureScreen.routePathEnroll,
+        builder: (_, __) =>
+            const FaceCaptureScreen(mode: FaceCaptureMode.enroll),
+      ),
+      GoRoute(
+        path: FaceCaptureScreen.routePathVerify,
+        builder: (_, __) =>
+            const FaceCaptureScreen(mode: FaceCaptureMode.verify),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
