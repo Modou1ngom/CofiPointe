@@ -44,13 +44,16 @@ class DashboardScreen extends ConsumerWidget {
     // Dès que le serveur a répondu, ses valeurs priment (même si null).
     final checkIn = todayAsync.hasValue ? api?.checkIn : local.checkIn;
     final checkOut = todayAsync.hasValue ? api?.checkOut : local.checkOut;
-    final summary = summaryAsync.valueOrNull ?? DashboardSummary.empty;
     final name = session.user?.fullName ?? 'Collaborateur';
     final scheme = Theme.of(context).colorScheme;
 
     final hasEntry = checkIn != null;
     final hasExit = checkOut != null;
     final present = hasEntry || hasExit;
+
+    // Ne pas masquer une erreur API derrière des zéros : on garde la donnée
+    // reçue, sinon un plancher basé sur le pointage du jour.
+    final summary = _resolveMonthlySummary(summaryAsync, presentToday: present);
 
     String statusTitle;
     if (hasEntry && hasExit) {
@@ -251,13 +254,22 @@ class DashboardScreen extends ConsumerWidget {
                   color: AppColors.charcoal,
                 ),
           ),
+          if (summaryAsync.hasError) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Compteurs indisponibles — tirez pour actualiser',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.error,
+                  ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
               Expanded(
                 child: _SummaryStat(
-                  label: 'Présents',
-                  value: '${summary.presentsCount}',
+                  label: 'Présences',
+                  value: summaryAsync.isLoading ? '…' : '${summary.presentsCount}',
                   accent: AppColors.success,
                 ),
               ),
@@ -265,15 +277,15 @@ class DashboardScreen extends ConsumerWidget {
               Expanded(
                 child: _SummaryStat(
                   label: 'Retards',
-                  value: '${summary.lateCount}',
+                  value: summaryAsync.isLoading ? '…' : '${summary.lateCount}',
                   accent: AppColors.warning,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _SummaryStat(
-                  label: 'Absents',
-                  value: '${summary.absentCount}',
+                  label: 'Absences',
+                  value: summaryAsync.isLoading ? '…' : '${summary.absentCount}',
                   accent: AppColors.charcoal,
                 ),
               ),
@@ -281,7 +293,7 @@ class DashboardScreen extends ConsumerWidget {
               Expanded(
                 child: _SummaryStat(
                   label: 'Congés',
-                  value: '${summary.onLeaveCount}',
+                  value: summaryAsync.isLoading ? '…' : '${summary.onLeaveCount}',
                   accent: scheme.primary,
                 ),
               ),
@@ -367,6 +379,34 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+DashboardSummary _resolveMonthlySummary(
+  AsyncValue<DashboardSummary> async, {
+  required bool presentToday,
+}) {
+  final data = async.valueOrNull;
+  if (data != null) {
+    if (presentToday && data.presentsCount < 1) {
+      return DashboardSummary(
+        presentsCount: 1,
+        lateCount: data.lateCount,
+        absentCount: data.absentCount,
+        onLeaveCount: data.onLeaveCount,
+        month: data.month,
+      );
+    }
+    return data;
+  }
+  if (presentToday) {
+    return const DashboardSummary(
+      presentsCount: 1,
+      lateCount: 0,
+      absentCount: 0,
+      onLeaveCount: 0,
+    );
+  }
+  return DashboardSummary.empty;
 }
 
 String _dashboardInitial(String name) {
