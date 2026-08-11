@@ -254,15 +254,6 @@ class DashboardScreen extends ConsumerWidget {
                   color: AppColors.charcoal,
                 ),
           ),
-          if (summaryAsync.hasError) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Compteurs indisponibles — tirez pour actualiser',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
-                  ),
-            ),
-          ],
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
