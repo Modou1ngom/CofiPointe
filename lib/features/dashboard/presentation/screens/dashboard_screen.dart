@@ -3,8 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../providers/attendance_ui_provider.dart';
 import '../../../../providers/dashboard_summary_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
@@ -26,6 +26,7 @@ class DashboardScreen extends ConsumerWidget {
     final todayAsync = ref.watch(pointageTodayProvider);
     final local = ref.watch(todayAttendanceUiProvider);
     final api = todayAsync.valueOrNull;
+    final summaryAsync = ref.watch(dashboardSummaryProvider);
 
     // Aligne le cache local sur le serveur dès qu’il répond.
     ref.listen<AsyncValue<PointageTodaySummary>>(pointageTodayProvider, (
@@ -43,7 +44,7 @@ class DashboardScreen extends ConsumerWidget {
     // Dès que le serveur a répondu, ses valeurs priment (même si null).
     final checkIn = todayAsync.hasValue ? api?.checkIn : local.checkIn;
     final checkOut = todayAsync.hasValue ? api?.checkOut : local.checkOut;
-    final summary = ref.watch(dashboardSummaryProvider);
+    final summary = summaryAsync.valueOrNull ?? DashboardSummary.empty;
     final name = session.user?.fullName ?? 'Collaborateur';
     final scheme = Theme.of(context).colorScheme;
 
@@ -114,6 +115,7 @@ class DashboardScreen extends ConsumerWidget {
             tooltip: 'Actualiser',
             onPressed: () {
               ref.invalidate(pointageTodayProvider);
+              ref.invalidate(dashboardSummaryProvider);
             },
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -243,7 +245,7 @@ class DashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Résumé aujourd’hui',
+            'Résumé du mois',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.charcoal,

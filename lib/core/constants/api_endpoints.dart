@@ -35,6 +35,7 @@ abstract final class ApiEndpoints {
   static const pointageSites = '/pointage/sites';
   static const pointage = '/pointage';
   static const pointageToday = '/pointage/today';
+  static const pointageDashboardSummary = '/pointage/dashboard-summary';
 
   static const declarations = '/declarations';
 }

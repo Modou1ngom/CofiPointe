@@ -5,6 +5,7 @@ import '../../../../config/test_fixtures.dart';
 import '../../../../models/office_zone.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../providers/dashboard_summary_provider.dart';
 import '../models/attendance_models.dart';
 import '../models/pointage_mobile_models.dart';
 
@@ -152,6 +153,56 @@ class AttendanceRemoteDataSource {
         );
       }
       return PointageTodaySummary.empty;
+    } catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  Future<DashboardSummary> fetchDashboardSummary() async {
+    if (useTestData) {
+      await TestFixtures.simulateNetworkDelay();
+      return DashboardSummary.mockCofina;
+    }
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        ApiEndpoints.pointageDashboardSummary,
+      );
+      final root = res.data;
+      if (root == null) {
+        return const DashboardSummary(
+          presentsCount: 0,
+          lateCount: 0,
+          absentCount: 0,
+          onLeaveCount: 0,
+        );
+      }
+      final data = root['data'] ?? root;
+      if (data is! Map) {
+        return const DashboardSummary(
+          presentsCount: 0,
+          lateCount: 0,
+          absentCount: 0,
+          onLeaveCount: 0,
+        );
+      }
+      final map = Map<String, dynamic>.from(data);
+      int readInt(List<String> keys) {
+        for (final k in keys) {
+          final v = map[k];
+          if (v is int) return v;
+          if (v is num) return v.toInt();
+          if (v is String) return int.tryParse(v) ?? 0;
+        }
+        return 0;
+      }
+
+      return DashboardSummary(
+        presentsCount: readInt(const ['presentsCount', 'presents']),
+        lateCount: readInt(const ['lateCount', 'retards']),
+        absentCount: readInt(const ['absentCount', 'absents']),
+        onLeaveCount: readInt(const ['onLeaveCount', 'conges']),
+        month: map['mois']?.toString(),
+      );
     } catch (e) {
       throw mapDioException(e);
     }
