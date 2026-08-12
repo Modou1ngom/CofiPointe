@@ -15,7 +15,8 @@
       background: radial-gradient(ellipse at 30% 15%, #2a2218, var(--bg) 55%);
       color: var(--fg); padding: 2rem 1.25rem 3rem; text-align: center;
     }
-    h1 { font-size: 1.75rem; margin: 0 0 0.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    h1 { font-size: 1.75rem; margin: 0 0 0.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .ver { color: var(--accent); font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem; }
     .lead { color: var(--muted); max-width: 22rem; margin: 0 auto 1.75rem; line-height: 1.45; font-size: 1rem; }
     .card {
       max-width: 22rem; margin: 0 auto; text-align: left;
@@ -30,11 +31,16 @@
       background: var(--accent); color: #1a1410; text-decoration: none;
       font-weight: 700; border-radius: 10px; font-size: 1.05rem;
     }
+    .qr {
+      margin: 1.5rem auto 0; width: min(240px, 70vw); height: auto;
+      background: #fff; padding: 12px; border-radius: 12px;
+    }
     .note { margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); max-width: 22rem; margin-left: auto; margin-right: auto; line-height: 1.4; }
   </style>
 </head>
 <body>
   <h1>CofiPointe</h1>
+  <p class="ver">Version 1.0.13</p>
   <p class="lead">Installation sur iPhone — ajoutez l’app à l’écran d’accueil.</p>
 
   <div class="card">
@@ -48,11 +54,12 @@
   </div>
 
   <a class="btn" id="openApp" href="./">Ouvrir CofiPointe</a>
-  <p class="note">Apple n’autorise pas l’installation d’un fichier APK. Cette version web s’installe sur l’écran d’accueil comme une app.</p>
+  <div>
+    <img class="qr" src="cofipointe-install-qr-iphone.png" alt="QR installation iPhone CofiPointe" width="240" height="240" />
+  </div>
+  <p class="note">Apple n’autorise pas l’installation d’un fichier APK. Cette version web s’installe sur l’écran d’accueil comme une app. Scan QR : caméra arrière pour le pointage.</p>
 
   <script>
-    // Si l'app Flutter web est deployée a la racine Pages, le bouton pointe vers /
-    // Sinon vers le meme dossier.
     var base = location.pathname.replace(/\/[^/]*$/, '/');
     if (base.indexOf('install-iphone') !== -1) {
       document.getElementById('openApp').href = base.replace(/install-iphone\/?$/, '') || '/';
