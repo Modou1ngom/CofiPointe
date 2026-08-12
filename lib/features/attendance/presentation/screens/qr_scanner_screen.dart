@@ -32,17 +32,24 @@ class QrScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
+  static bool get _isPhoneNative =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android);
+
   late final MobileScannerController _controller = MobileScannerController(
     // Sur web / PC : pas de caméra arrière → démarrage manuel + facing adapté.
     autoStart: false,
     // Analyse chaque frame sans délai entre détections.
     detectionSpeed: DetectionSpeed.unrestricted,
-    facing: kIsWeb ? CameraFacing.front : CameraFacing.back,
+    // Pointage QR : toujours la caméra arrière sur téléphone (iPhone inclus).
+    facing: _isPhoneNative ? CameraFacing.back : CameraFacing.front,
     torchEnabled: false,
     formats: const [BarcodeFormat.qrCode],
     // Meilleure netteté QR (Android sinon ~640×480).
-    cameraResolution: kIsWeb ? null : const Size(1280, 720),
-    useNewCameraSelector: !kIsWeb,
+    cameraResolution: _isPhoneNative ? const Size(1280, 720) : null,
+    // Sélecteur expérimental Android uniquement (sur iOS il peut ouvrir la frontale).
+    useNewCameraSelector: defaultTargetPlatform == TargetPlatform.android,
     returnImage: false,
   );
 
@@ -69,6 +76,21 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     super.dispose();
   }
 
+  /// Sur téléphone, refusece la caméra arrière si iOS a ouvert la frontale.
+  Future<void> _ensureBackCamera() async {
+    if (!_isPhoneNative) return;
+    for (var i = 0; i < 2; i++) {
+      if (_controller.value.cameraDirection == CameraFacing.back) {
+        return;
+      }
+      try {
+        await _controller.switchCamera();
+      } catch (_) {
+        break;
+      }
+    }
+  }
+
   Future<void> _startCamera() async {
     if (!mounted) return;
     setState(() {
@@ -91,15 +113,21 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         await _controller.stop();
       } catch (_) {}
 
-      // PC / navigateur : webcam = front. Téléphone : arrière puis secours avant.
-      final preferred =
-          kIsWeb ? CameraFacing.front : CameraFacing.back;
-      try {
-        await _controller.start(cameraDirection: preferred);
-      } catch (_) {
-        final fallback =
-            preferred == CameraFacing.back ? CameraFacing.front : CameraFacing.back;
-        await _controller.start(cameraDirection: fallback);
+      if (_isPhoneNative) {
+        // iPhone / Android : caméra arrière uniquement (pas de secours frontale).
+        try {
+          await _controller.start(cameraDirection: CameraFacing.back);
+        } catch (_) {
+          await _controller.start();
+        }
+        await _ensureBackCamera();
+      } else {
+        // PC / navigateur : webcam frontale, puis secours.
+        try {
+          await _controller.start(cameraDirection: CameraFacing.front);
+        } catch (_) {
+          await _controller.start(cameraDirection: CameraFacing.back);
+        }
       }
 
       if (mounted) {
@@ -313,15 +341,21 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   Future<void> _resumeScanner() async {
     if (!mounted || _starting) return;
     try {
-      final preferred = kIsWeb ? CameraFacing.front : CameraFacing.back;
-      await _controller.start(cameraDirection: preferred);
-    } catch (_) {
-      try {
-        await _controller.start(
-          cameraDirection: kIsWeb ? CameraFacing.back : CameraFacing.front,
-        );
-      } catch (_) {}
-    }
+      if (_isPhoneNative) {
+        try {
+          await _controller.start(cameraDirection: CameraFacing.back);
+        } catch (_) {
+          await _controller.start();
+        }
+        await _ensureBackCamera();
+      } else {
+        try {
+          await _controller.start(cameraDirection: CameraFacing.front);
+        } catch (_) {
+          await _controller.start(cameraDirection: CameraFacing.back);
+        }
+      }
+    } catch (_) {}
   }
 
   @override
