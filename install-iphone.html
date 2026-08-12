@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="CofiPointe" />
+  <title>CofiPointe — Installer (iPhone)</title>
+  <style>
+    :root { --bg:#1a1410; --fg:#f5ebe0; --accent:#c4a574; --muted:#b8a898; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at 30% 15%, #2a2218, var(--bg) 55%);
+      color: var(--fg); padding: 2rem 1.25rem 3rem; text-align: center;
+    }
+    h1 { font-size: 1.75rem; margin: 0 0 0.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .ver { color: var(--accent); font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem; }
+    .lead { color: var(--muted); max-width: 22rem; margin: 0 auto 1.75rem; line-height: 1.45; font-size: 1rem; }
+    .card {
+      max-width: 22rem; margin: 0 auto; text-align: left;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px; padding: 1.25rem 1.35rem;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--accent); }
+    ol { margin: 0; padding-left: 1.2rem; color: var(--fg); line-height: 1.55; }
+    li { margin-bottom: 0.65rem; }
+    a.btn {
+      display: inline-block; margin-top: 1.5rem; padding: 0.95rem 1.5rem;
+      background: var(--accent); color: #1a1410; text-decoration: none;
+      font-weight: 700; border-radius: 10px; font-size: 1.05rem;
+    }
+    .qr {
+      margin: 1.5rem auto 0; width: min(240px, 70vw); height: auto;
+      background: #fff; padding: 12px; border-radius: 12px;
+    }
+    .note { margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); max-width: 22rem; margin-left: auto; margin-right: auto; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>CofiPointe</h1>
+  <p class="ver">Version 1.0.13</p>
+  <p class="lead">Installation sur iPhone — ajoutez l’app à l’écran d’accueil.</p>
+
+  <div class="card">
+    <h2>Sur iPhone (Safari)</h2>
+    <ol>
+      <li>Appuyez sur le bouton <strong>Ouvrir CofiPointe</strong> ci‑dessous.</li>
+      <li>Touchez le bouton <strong>Partager</strong> <span aria-hidden="true">⇧□</span> en bas de Safari.</li>
+      <li>Choisissez <strong>Sur l’écran d’accueil</strong>.</li>
+      <li>Validez avec <strong>Ajouter</strong>.</li>
+    </ol>
+  </div>
+
+  <a class="btn" id="openApp" href="./">Ouvrir CofiPointe</a>
+  <div>
+    <img class="qr" src="cofipointe-install-qr-iphone.png" alt="QR installation iPhone CofiPointe" width="240" height="240" />
+  </div>
+  <p class="note">Apple n’autorise pas l’installation d’un fichier APK. Cette version web s’installe sur l’écran d’accueil comme une app. Scan QR : caméra arrière pour le pointage.</p>
+
+  <script>
+    var base = location.pathname.replace(/\/[^/]*$/, '/');
+    if (base.indexOf('install-iphone') !== -1) {
+      document.getElementById('openApp').href = base.replace(/install-iphone\/?$/, '') || '/';
+    }
+  </script>
+</body>
+</html>
