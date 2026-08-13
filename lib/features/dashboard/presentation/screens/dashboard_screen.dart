@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/errors/failures.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/app_date_format.dart';
 import '../../../../providers/attendance_ui_provider.dart';
@@ -11,6 +10,7 @@ import '../../../../providers/dashboard_summary_provider.dart';
 import '../../../../providers/pointage_mobile_providers.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/cards/glass_card.dart';
+import '../../../../widgets/layout/shell_insets.dart';
 import '../../../attendance/data/models/pointage_mobile_models.dart';
 import '../../../attendance/presentation/screens/qr_scanner_screen.dart';
 import '../../../declarations/presentation/screens/declarations_screen.dart';
@@ -29,7 +29,7 @@ class DashboardScreen extends ConsumerWidget {
     final api = todayAsync.valueOrNull;
     final summaryAsync = ref.watch(dashboardSummaryProvider);
 
-    // Aligne le cache local sur le serveur dÃ¨s quâ€™il rÃ©pond.
+    // Aligne le cache local sur le serveur dès qu’il répond.
     ref.listen<AsyncValue<PointageTodaySummary>>(pointageTodayProvider, (
       previous,
       next,
@@ -42,8 +42,8 @@ class DashboardScreen extends ConsumerWidget {
       });
     });
 
-    // DÃ¨s que le serveur a rÃ©pondu, ses valeurs priment (mÃªme si null).
-    // Les pointages synthÃ©tiques (fÃ©riÃ© auto) ne sont plus renvoyÃ©s comme checkIn/Out.
+    // Dès que le serveur a répondu, ses valeurs priment (même si null).
+    // Les pointages synthétiques (férié auto) ne sont plus renvoyés comme checkIn/Out.
     final checkIn = todayAsync.hasValue ? api?.checkIn : local.checkIn;
     final checkOut = todayAsync.hasValue ? api?.checkOut : local.checkOut;
     final autoFerie = api?.autoFerie == true;
@@ -60,27 +60,27 @@ class DashboardScreen extends ConsumerWidget {
     if (autoFerie) {
       statusTitle = api?.statusLabel?.trim().isNotEmpty == true
           ? api!.statusLabel!
-          : 'Jour fÃ©riÃ© (auto)';
+          : 'Jour férié (auto)';
     } else if (hasEntry && hasExit) {
-      statusTitle = 'PrÃ©sent';
+      statusTitle = 'Présent';
     } else if (hasExit && !hasEntry) {
-      statusTitle = 'Sortie enregistrÃ©e';
+      statusTitle = 'Sortie enregistrée';
     } else if (hasEntry) {
-      statusTitle = 'PrÃ©sent';
+      statusTitle = 'Présent';
     } else {
       statusTitle = 'En attente de pointage';
     }
 
     String? statusDetail;
     if (autoFerie) {
-      statusDetail = 'Aucun scan requis â€” couverture automatique';
+      statusDetail = 'Aucun scan requis — couverture automatique';
     } else if (hasEntry && hasExit) {
       statusDetail =
-          'EntrÃ©e : ${AppDateFormat.formatTime12h(checkIn)} Â· Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
+          'Entrée : ${AppDateFormat.formatTime12h(checkIn)} · Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
     } else if (hasExit && !hasEntry) {
       statusDetail = 'Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
     } else if (hasEntry) {
-      statusDetail = 'EntrÃ©e : ${AppDateFormat.formatTime12h(checkIn)}';
+      statusDetail = 'Entrée : ${AppDateFormat.formatTime12h(checkIn)}';
     }
 
     final scheduledIn = api?.scheduledArrival ?? '08h00';
@@ -144,14 +144,17 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
-          AppSpacing.xl,
-        ),
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 380;
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              shellBottomPadding(context, extra: 24),
+            ),
+            children: [
           GlassCard(
             child: Row(
               children: [
@@ -166,7 +169,7 @@ class DashboardScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'STATUT AUJOURDâ€™HUI',
+                        'STATUT AUJOURD’HUI',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               letterSpacing: 0.9,
                               color: scheme.onSurfaceVariant,
@@ -240,7 +243,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Pointez votre entrÃ©e ou votre sortie en toute sÃ©curitÃ©.',
+                            'Pointez votre entrée ou votre sortie en toute sécurité.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.92),
                               fontSize: 13,
@@ -260,52 +263,111 @@ class DashboardScreen extends ConsumerWidget {
           OutlinedButton.icon(
             onPressed: () => context.push(DeclarationsScreen.routePath),
             icon: const Icon(Icons.description_outlined),
-            label: const Text('Mes dÃ©clarations'),
+            label: const Text('Mes déclarations'),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'RÃ©sumÃ© du mois',
+            'Résumé du mois',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.charcoal,
                 ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryStat(
-                  label: 'PrÃ©sences',
-                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.presentsCount}',
-                  accent: AppColors.success,
+          if (narrow)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryStat(
+                        label: 'Présences',
+                        value: summaryAsync.isLoading
+                            ? '…'
+                            : '${summary.presentsCount}',
+                        accent: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _SummaryStat(
+                        label: 'Retards',
+                        value: summaryAsync.isLoading
+                            ? '…'
+                            : '${summary.lateCount}',
+                        accent: AppColors.warning,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryStat(
-                  label: 'Retards',
-                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.lateCount}',
-                  accent: AppColors.warning,
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryStat(
+                        label: 'Absences',
+                        value: summaryAsync.isLoading
+                            ? '…'
+                            : '${summary.absentCount}',
+                        accent: AppColors.charcoal,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _SummaryStat(
+                        label: 'Congés',
+                        value: summaryAsync.isLoading
+                            ? '…'
+                            : '${summary.onLeaveCount}',
+                        accent: scheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryStat(
-                  label: 'Absences',
-                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.absentCount}',
-                  accent: AppColors.charcoal,
+              ],
+            ).animate().fadeIn(delay: 120.ms)
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Présences',
+                    value: summaryAsync.isLoading
+                        ? '…'
+                        : '${summary.presentsCount}',
+                    accent: AppColors.success,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _SummaryStat(
-                  label: 'CongÃ©s',
-                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.onLeaveCount}',
-                  accent: scheme.primary,
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Retards',
+                    value:
+                        summaryAsync.isLoading ? '…' : '${summary.lateCount}',
+                    accent: AppColors.warning,
+                  ),
                 ),
-              ),
-            ],
-          ).animate().fadeIn(delay: 120.ms),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Absences',
+                    value:
+                        summaryAsync.isLoading ? '…' : '${summary.absentCount}',
+                    accent: AppColors.charcoal,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _SummaryStat(
+                    label: 'Congés',
+                    value: summaryAsync.isLoading
+                        ? '…'
+                        : '${summary.onLeaveCount}',
+                    accent: scheme.primary,
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 120.ms),
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Mes horaires',
@@ -322,7 +384,7 @@ class DashboardScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Horaires prÃ©vus',
+                    'Horaires prévus',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
@@ -333,14 +395,14 @@ class DashboardScreen extends ConsumerWidget {
                     children: [
                       _timeColumn(
                         context,
-                        label: 'EntrÃ©e prÃ©vue',
+                        label: 'Entrée prévue',
                         value: scheduledIn,
                         accent: AppColors.success,
                       ),
                       const SizedBox(width: AppSpacing.lg),
                       _timeColumn(
                         context,
-                        label: 'Sortie prÃ©vue',
+                        label: 'Sortie prévue',
                         value: scheduledOut,
                         accent: AppColors.primary,
                       ),
@@ -348,7 +410,7 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Pointage rÃ©el',
+                    'Pointage réel',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
@@ -359,7 +421,7 @@ class DashboardScreen extends ConsumerWidget {
                     children: [
                       _timeColumn(
                         context,
-                        label: 'EntrÃ©e',
+                        label: 'Entrée',
                         value: entryDisplay,
                         accent: AppColors.success,
                       ),
@@ -380,37 +442,18 @@ class DashboardScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                _todaySyncErrorMessage(todayAsync.error),
+                'Pointage du jour : impossible de synchroniser (réessayez).',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.error,
                     ),
               ),
             ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
-
-
-  static String _todaySyncErrorMessage(Object? error) {
-    if (error is NetworkFailure) {
-      return 'Pointage du jour : pas de connexion (réessayez).';
-    }
-    if (error is AuthFailure) {
-      return 'Pointage du jour : session expirée — reconnectez-vous.';
-    }
-    if (error is ServerFailure) {
-      final code = error.code;
-      if (code == '500' || code == '502' || code == '503') {
-        return 'Pointage du jour : serveur indisponible (réessayez plus tard).';
-      }
-      if (code == '404') {
-        return 'Pointage du jour : service non déployé côté serveur.';
-      }
-    }
-    return 'Pointage du jour : impossible de synchroniser (réessayez).';
-  }
-
   Widget _timeColumn(
     BuildContext context, {
     required String label,
@@ -451,7 +494,7 @@ DashboardSummary _resolveMonthlySummary(
   if (data != null) {
     return data;
   }
-  // Pas de plancher artificiel : afficher 0 tant que l'API n'a pas répondu.
+  // Pas de plancher artificiel : afficher 0 tant que l’API n’a pas répondu.
   if (async.isLoading) {
     return DashboardSummary.empty;
   }

@@ -102,7 +102,16 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   String get _dateFinLabel => _type == 'mission' ? 'Date de retour' : 'Date de fin';
 
   String get _allaitementHeureLabel =>
-      _allaitementSens == 'sortie' ? 'Heure de sortie *' : 'Heure d’entrée *';
+      _allaitementSens == 'sortie' ? 'Heure (après-midi) *' : 'Heure (matin) *';
+
+  void _applyAllaitementHeureDefaults() {
+    _heureFin = null;
+    if (_allaitementSens == 'sortie') {
+      _heureDebut = const TimeOfDay(hour: 16, minute: 0);
+    } else {
+      _heureDebut = const TimeOfDay(hour: 9, minute: 0);
+    }
+  }
 
   @override
   void initState() {
@@ -123,6 +132,9 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       _type = 'regularisation';
       _pointageManquant = widget.pointageManquant;
       _applyNonPointageMotif();
+    }
+    if (_needsAllaitement) {
+      _applyAllaitementHeureDefaults();
     }
     _load();
   }
@@ -317,8 +329,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       showAppToast(
         context,
         _allaitementSens == 'sortie'
-            ? 'Indiquez l’heure de sortie autorisée.'
-            : 'Indiquez l’heure d’entrée autorisée.',
+            ? 'Indiquez l’heure de l’après-midi.'
+            : 'Indiquez l’heure du matin.',
         type: ToastType.error,
       );
       return;
@@ -488,8 +500,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                             _heureFin = null;
                           }
                           if (_needsAllaitement) {
-                            _heureFin = null;
                             _allaitementSens = 'entree';
+                            _applyAllaitementHeureDefaults();
                           }
                           if (!_needsLieu) _lieuCtrl.clear();
                         });
@@ -517,18 +529,19 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Sens horaire *',
                         border: OutlineInputBorder(),
-                        helperText:
-                            'Entrée : retard après heure + tolérance. Sortie : pointage ramené à 17:00.',
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'entree', child: Text('Entrée')),
-                        DropdownMenuItem(value: 'sortie', child: Text('Sortie')),
+                        DropdownMenuItem(value: 'entree', child: Text('Matin')),
+                        DropdownMenuItem(
+                          value: 'sortie',
+                          child: Text('Après-midi'),
+                        ),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
                         setState(() {
                           _allaitementSens = v;
-                          _heureFin = null;
+                          _applyAllaitementHeureDefaults();
                         });
                       },
                     ),
@@ -661,7 +674,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       final lieu = d['lieu'];
                       String heures = '';
                       if (d['type'] == 'allaitement') {
-                        final sens = d['sens'] == 'sortie' ? 'Sortie' : 'Entrée';
+                        final sens =
+                            d['sens'] == 'sortie' ? 'Après-midi' : 'Matin';
                         final h = d['heure'] ?? d['heure_debut'] ?? d['heure_fin'];
                         if (h != null) heures = ' ($sens $h)';
                       } else if (d['heure_debut'] != null && d['heure_fin'] != null) {

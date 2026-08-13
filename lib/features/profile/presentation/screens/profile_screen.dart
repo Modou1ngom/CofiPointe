@@ -9,6 +9,7 @@ import '../../../../providers/async_data_providers.dart';
 import '../../../../providers/theme_mode_provider.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
+import '../../../../widgets/layout/shell_insets.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/screens/biometric_activation_screen.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
@@ -27,7 +28,12 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Mon profil')),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
+          shellBottomPadding(context, extra: 24),
+        ),
         children: [
           profileAsync.when(
             loading: () => const Card(

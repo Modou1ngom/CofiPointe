@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
+import '../../../../widgets/layout/shell_insets.dart';
 import '../widgets/notification_tile.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -89,6 +90,9 @@ class NotificationsScreen extends ConsumerWidget {
               },
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  bottom: shellBottomPadding(context, extra: 24),
+                ),
                 itemCount: items.length,
                 separatorBuilder: (_, __) => const Divider(
                   height: 1,

@@ -10,6 +10,7 @@ import '../../../../features/attendance/data/models/attendance_models.dart';
 import '../../../../features/declarations/presentation/screens/declarations_screen.dart';
 import '../../../../providers/async_data_providers.dart';
 import '../../../../widgets/feedback/app_skeleton.dart';
+import '../../../../widgets/layout/shell_insets.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -72,7 +73,12 @@ class HistoryScreen extends ConsumerWidget {
                         ref.invalidate(attendanceHistoryProvider);
                       })
                     : ListView.separated(
-                        padding: const EdgeInsets.all(AppSpacing.md),
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          shellBottomPadding(context, extra: 24),
+                        ),
                         itemCount: records.length,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: AppSpacing.sm),
