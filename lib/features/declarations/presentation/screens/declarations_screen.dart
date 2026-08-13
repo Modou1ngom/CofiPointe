@@ -53,6 +53,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   DateTime? _dateFin;
   TimeOfDay? _heureDebut;
   TimeOfDay? _heureFin;
+  /// Allaitement : `entree` | `sortie`
+  String _allaitementSens = 'entree';
   String? _justificatifPath;
   String? _justificatifName;
   String? _pointageManquant;
@@ -64,6 +66,7 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
     {'value': 'conge_annuel', 'label': 'Congé annuel'},
     {'value': 'conge_maladie', 'label': 'Congé maladie'},
     {'value': 'permission_exceptionnelle', 'label': 'Permission exceptionnelle'},
+    {'value': 'allaitement', 'label': 'Allaitement'},
     {'value': 'mission', 'label': 'Mission'},
     {'value': 'formation', 'label': 'Formation'},
   ];
@@ -74,6 +77,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
         'absence',
         'conge_annuel',
         'conge_maladie',
+        'permission_exceptionnelle',
+        'allaitement',
         'mission',
         'formation',
         'conge',
@@ -84,6 +89,8 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       (_nonPointageMode &&
           (_pointageManquant == 'entree' || _pointageManquant == 'sortie'));
 
+  bool get _needsAllaitement => !_nonPointageMode && _type == 'allaitement';
+
   bool get _needsLieu => !_nonPointageMode && _type == 'mission';
 
   String get _dateDebutLabel {
@@ -93,6 +100,9 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
   }
 
   String get _dateFinLabel => _type == 'mission' ? 'Date de retour' : 'Date de fin';
+
+  String get _allaitementHeureLabel =>
+      _allaitementSens == 'sortie' ? 'Heure de sortie *' : 'Heure d’entrée *';
 
   @override
   void initState() {
@@ -158,6 +168,14 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
         queryParameters: {'mois': mois},
       );
       final data = res.data?['data'];
+      final apiTypes = res.data?['types'];
+      final parsedTypes = apiTypes is List
+          ? apiTypes
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .where((t) => t['value']?.toString() != 'regularisation')
+              .toList()
+          : <Map<String, dynamic>>[];
       setState(() {
         _items = data is List
             ? data
@@ -165,7 +183,9 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList()
             : [];
-        _types = List<Map<String, dynamic>>.from(_fallbackTypes);
+        _types = parsedTypes.isNotEmpty
+            ? parsedTypes
+            : List<Map<String, dynamic>>.from(_fallbackTypes);
       });
     } catch (e) {
       setState(() {
@@ -280,6 +300,16 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
       );
       return;
     }
+    if (_needsAllaitement && _heureDebut == null) {
+      showAppToast(
+        context,
+        _allaitementSens == 'sortie'
+            ? 'Indiquez l’heure de sortie autorisée.'
+            : 'Indiquez l’heure d’entrée autorisée.',
+        type: ToastType.error,
+      );
+      return;
+    }
     if (_nonPointageMode && _pointageManquant == 'entree' && _heureDebut == null) {
       showAppToast(context, 'Indiquez l’heure d’entrée déclarée.', type: ToastType.error);
       return;
@@ -302,8 +332,13 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
         'motif': motif,
         if (_commentCtrl.text.trim().isNotEmpty) 'commentaire': _commentCtrl.text.trim(),
         if (_needsDateRange && _dateFin != null) 'date_fin': _fmtDateApi(_dateFin!),
-        if (_heureDebut != null) 'heure_debut': _fmtTime(_heureDebut!),
-        if (_heureFin != null) 'heure_fin': _fmtTime(_heureFin!),
+        if (_needsAllaitement) ...{
+          'sens': _allaitementSens,
+          if (_heureDebut != null) 'heure_debut': _fmtTime(_heureDebut!),
+        } else ...{
+          if (_heureDebut != null) 'heure_debut': _fmtTime(_heureDebut!),
+          if (_heureFin != null) 'heure_fin': _fmtTime(_heureFin!),
+        },
         if (_needsLieu) 'lieu': _lieuCtrl.text.trim(),
       };
 
@@ -435,9 +470,13 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                         setState(() {
                           _type = v;
                           if (!_needsDateRange) _dateFin = null;
-                          if (!_needsHeures) {
+                          if (!_needsHeures && !_needsAllaitement) {
                             _heureDebut = null;
                             _heureFin = null;
+                          }
+                          if (_needsAllaitement) {
+                            _heureFin = null;
+                            _allaitementSens = 'entree';
                           }
                           if (!_needsLieu) _lieuCtrl.clear();
                         });
@@ -459,6 +498,36 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () => _pickDate(fin: true),
                     ),
+                  if (_needsAllaitement) ...[
+                    DropdownButtonFormField<String>(
+                      value: _allaitementSens,
+                      decoration: const InputDecoration(
+                        labelText: 'Sens horaire *',
+                        border: OutlineInputBorder(),
+                        helperText:
+                            'Entrée : retard après heure + tolérance. Sortie : pointage ramené à 17:00.',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'entree', child: Text('Entrée')),
+                        DropdownMenuItem(value: 'sortie', child: Text('Sortie')),
+                      ],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() {
+                          _allaitementSens = v;
+                          _heureFin = null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_allaitementHeureLabel),
+                      subtitle: Text(_heureDebut == null ? 'Choisir…' : _fmtTime(_heureDebut!)),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () => _pickTime(fin: false),
+                    ),
+                  ],
                   if (_needsHeures && !_nonPointageMode) ...[
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -577,9 +646,14 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                       final fin = d['date_fin'];
                       final periode = fin == null || '$fin'.isEmpty ? '$debut' : '$debut → $fin';
                       final lieu = d['lieu'];
-                      final heures = (d['heure_debut'] != null && d['heure_fin'] != null)
-                          ? ' (${d['heure_debut']}–${d['heure_fin']})'
-                          : '';
+                      String heures = '';
+                      if (d['type'] == 'allaitement') {
+                        final sens = d['sens'] == 'sortie' ? 'Sortie' : 'Entrée';
+                        final h = d['heure'] ?? d['heure_debut'] ?? d['heure_fin'];
+                        if (h != null) heures = ' ($sens $h)';
+                      } else if (d['heure_debut'] != null && d['heure_fin'] != null) {
+                        heures = ' (${d['heure_debut']}–${d['heure_fin']})';
+                      }
                       return Card(
                         child: ListTile(
                           title: Text('$typeLabel — ${d['statut'] ?? ''}'),
