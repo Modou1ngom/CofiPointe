@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/errors/failures.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/app_date_format.dart';
 import '../../../../providers/attendance_ui_provider.dart';
@@ -28,53 +29,68 @@ class DashboardScreen extends ConsumerWidget {
     final api = todayAsync.valueOrNull;
     final summaryAsync = ref.watch(dashboardSummaryProvider);
 
-    // Aligne le cache local sur le serveur dès qu’il répond.
+    // Aligne le cache local sur le serveur dÃ¨s quâ€™il rÃ©pond.
     ref.listen<AsyncValue<PointageTodaySummary>>(pointageTodayProvider, (
       previous,
       next,
     ) {
       next.whenData((summary) {
         ref.read(todayAttendanceUiProvider.notifier).syncToday(
-              checkIn: summary.checkIn,
-              checkOut: summary.checkOut,
+              checkIn: summary.autoFerie ? null : summary.checkIn,
+              checkOut: summary.autoFerie ? null : summary.checkOut,
             );
       });
     });
 
-    // Dès que le serveur a répondu, ses valeurs priment (même si null).
+    // DÃ¨s que le serveur a rÃ©pondu, ses valeurs priment (mÃªme si null).
+    // Les pointages synthÃ©tiques (fÃ©riÃ© auto) ne sont plus renvoyÃ©s comme checkIn/Out.
     final checkIn = todayAsync.hasValue ? api?.checkIn : local.checkIn;
     final checkOut = todayAsync.hasValue ? api?.checkOut : local.checkOut;
+    final autoFerie = api?.autoFerie == true;
     final name = session.user?.fullName ?? 'Collaborateur';
     final scheme = Theme.of(context).colorScheme;
 
     final hasEntry = checkIn != null;
     final hasExit = checkOut != null;
-    final present = hasEntry || hasExit;
+    final present = !autoFerie && (hasEntry || hasExit);
 
-    // Ne pas masquer une erreur API derrière des zéros : on garde la donnée
-    // reçue, sinon un plancher basé sur le pointage du jour.
     final summary = _resolveMonthlySummary(summaryAsync, presentToday: present);
 
     String statusTitle;
-    if (hasEntry && hasExit) {
-      statusTitle = 'Présent';
+    if (autoFerie) {
+      statusTitle = api?.statusLabel?.trim().isNotEmpty == true
+          ? api!.statusLabel!
+          : 'Jour fÃ©riÃ© (auto)';
+    } else if (hasEntry && hasExit) {
+      statusTitle = 'PrÃ©sent';
     } else if (hasExit && !hasEntry) {
-      statusTitle = 'Sortie enregistrée';
+      statusTitle = 'Sortie enregistrÃ©e';
     } else if (hasEntry) {
-      statusTitle = 'Présent';
+      statusTitle = 'PrÃ©sent';
     } else {
       statusTitle = 'En attente de pointage';
     }
 
     String? statusDetail;
-    if (hasEntry && hasExit) {
+    if (autoFerie) {
+      statusDetail = 'Aucun scan requis â€” couverture automatique';
+    } else if (hasEntry && hasExit) {
       statusDetail =
-          'Entrée : ${AppDateFormat.formatTime12h(checkIn)} · Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
+          'EntrÃ©e : ${AppDateFormat.formatTime12h(checkIn)} Â· Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
     } else if (hasExit && !hasEntry) {
       statusDetail = 'Sortie : ${AppDateFormat.formatTime12h(checkOut)}';
     } else if (hasEntry) {
-      statusDetail = 'Entrée : ${AppDateFormat.formatTime12h(checkIn)}';
+      statusDetail = 'EntrÃ©e : ${AppDateFormat.formatTime12h(checkIn)}';
     }
+
+    final scheduledIn = api?.scheduledArrival ?? '08h00';
+    final scheduledOut = api?.scheduledDeparture ?? '17h00';
+    final entryDisplay = checkIn == null
+        ? '--:--'
+        : (api?.checkInLabel ?? AppDateFormat.formatTime12h(checkIn));
+    final exitDisplay = checkOut == null
+        ? '--:--'
+        : (api?.checkOutLabel ?? AppDateFormat.formatTime12h(checkOut));
 
     return Scaffold(
       appBar: AppBar(
@@ -150,7 +166,7 @@ class DashboardScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'STATUT AUJOURD’HUI',
+                        'STATUT AUJOURDâ€™HUI',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               letterSpacing: 0.9,
                               color: scheme.onSurfaceVariant,
@@ -224,7 +240,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Pointez votre entrée ou votre sortie en toute sécurité.',
+                            'Pointez votre entrÃ©e ou votre sortie en toute sÃ©curitÃ©.',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.92),
                               fontSize: 13,
@@ -244,11 +260,11 @@ class DashboardScreen extends ConsumerWidget {
           OutlinedButton.icon(
             onPressed: () => context.push(DeclarationsScreen.routePath),
             icon: const Icon(Icons.description_outlined),
-            label: const Text('Mes déclarations'),
+            label: const Text('Mes dÃ©clarations'),
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Résumé du mois',
+            'RÃ©sumÃ© du mois',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppColors.charcoal,
@@ -259,8 +275,8 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: _SummaryStat(
-                  label: 'Présences',
-                  value: summaryAsync.isLoading ? '…' : '${summary.presentsCount}',
+                  label: 'PrÃ©sences',
+                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.presentsCount}',
                   accent: AppColors.success,
                 ),
               ),
@@ -268,7 +284,7 @@ class DashboardScreen extends ConsumerWidget {
               Expanded(
                 child: _SummaryStat(
                   label: 'Retards',
-                  value: summaryAsync.isLoading ? '…' : '${summary.lateCount}',
+                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.lateCount}',
                   accent: AppColors.warning,
                 ),
               ),
@@ -276,15 +292,15 @@ class DashboardScreen extends ConsumerWidget {
               Expanded(
                 child: _SummaryStat(
                   label: 'Absences',
-                  value: summaryAsync.isLoading ? '…' : '${summary.absentCount}',
+                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.absentCount}',
                   accent: AppColors.charcoal,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _SummaryStat(
-                  label: 'Congés',
-                  value: summaryAsync.isLoading ? '…' : '${summary.onLeaveCount}',
+                  label: 'CongÃ©s',
+                  value: summaryAsync.isLoading ? 'â€¦' : '${summary.onLeaveCount}',
                   accent: scheme.primary,
                 ),
               ),
@@ -302,24 +318,59 @@ class DashboardScreen extends ConsumerWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _timeColumn(
-                    context,
-                    label: 'Entrée',
-                    value: checkIn != null
-                        ? AppDateFormat.formatTime12h(checkIn)
-                        : '--:--',
-                    accent: AppColors.success,
+                  Text(
+                    'Horaires prÃ©vus',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
-                  const SizedBox(width: AppSpacing.lg),
-                  _timeColumn(
-                    context,
-                    label: 'Sortie',
-                    value: checkOut != null
-                        ? AppDateFormat.formatTime12h(checkOut)
-                        : '--:--',
-                    accent: AppColors.primary,
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      _timeColumn(
+                        context,
+                        label: 'EntrÃ©e prÃ©vue',
+                        value: scheduledIn,
+                        accent: AppColors.success,
+                      ),
+                      const SizedBox(width: AppSpacing.lg),
+                      _timeColumn(
+                        context,
+                        label: 'Sortie prÃ©vue',
+                        value: scheduledOut,
+                        accent: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'Pointage rÃ©el',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      _timeColumn(
+                        context,
+                        label: 'EntrÃ©e',
+                        value: entryDisplay,
+                        accent: AppColors.success,
+                      ),
+                      const SizedBox(width: AppSpacing.lg),
+                      _timeColumn(
+                        context,
+                        label: 'Sortie',
+                        value: exitDisplay,
+                        accent: AppColors.primary,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -329,7 +380,7 @@ class DashboardScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                'Pointage du jour : impossible de synchroniser (réessayez).',
+                _todaySyncErrorMessage(todayAsync.error),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.error,
                     ),
@@ -338,6 +389,26 @@ class DashboardScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+
+  static String _todaySyncErrorMessage(Object? error) {
+    if (error is NetworkFailure) {
+      return 'Pointage du jour : pas de connexion (réessayez).';
+    }
+    if (error is AuthFailure) {
+      return 'Pointage du jour : session expirée — reconnectez-vous.';
+    }
+    if (error is ServerFailure) {
+      final code = error.code;
+      if (code == '500' || code == '502' || code == '503') {
+        return 'Pointage du jour : serveur indisponible (réessayez plus tard).';
+      }
+      if (code == '404') {
+        return 'Pointage du jour : service non déployé côté serveur.';
+      }
+    }
+    return 'Pointage du jour : impossible de synchroniser (réessayez).';
   }
 
   Widget _timeColumn(
@@ -378,16 +449,11 @@ DashboardSummary _resolveMonthlySummary(
 }) {
   final data = async.valueOrNull;
   if (data != null) {
-    if (presentToday && data.presentsCount < 1) {
-      return DashboardSummary(
-        presentsCount: 1,
-        lateCount: data.lateCount,
-        absentCount: data.absentCount,
-        onLeaveCount: data.onLeaveCount,
-        month: data.month,
-      );
-    }
     return data;
+  }
+  // Pas de plancher artificiel : afficher 0 tant que l'API n'a pas répondu.
+  if (async.isLoading) {
+    return DashboardSummary.empty;
   }
   if (presentToday) {
     return const DashboardSummary(

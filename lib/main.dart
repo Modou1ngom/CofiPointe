@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/network/dio_interceptor.dart';
 import 'providers/app_providers.dart';
 import 'services/push_notification_service.dart';
 import 'services/session_controller.dart';
@@ -33,6 +34,11 @@ Future<void> main() async {
   );
 
   await container.read(sessionControllerProvider.notifier).hydrate();
+
+  // Jeton expiré / révoqué → déconnexion locale (sinon UI « connectée » + sync KO).
+  AuthInterceptor.onUnauthorized = () async {
+    await container.read(sessionControllerProvider.notifier).logout();
+  };
 
   runApp(
     UncontrolledProviderScope(

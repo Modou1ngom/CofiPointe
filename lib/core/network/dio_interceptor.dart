@@ -11,6 +11,11 @@ class AuthInterceptor extends Interceptor {
   /// Cache partagé (évite dépendances circulaires providers).
   static String? sharedCachedToken;
 
+  /// Appelé une fois sur 401 pour forcer une reconnexion (session locale périmée).
+  static Future<void> Function()? onUnauthorized;
+
+  static bool _handlingUnauthorized = false;
+
   static void setSharedToken(String? token) => sharedCachedToken = token;
 
   static void clearSharedToken() => sharedCachedToken = null;
@@ -26,5 +31,25 @@ class AuthInterceptor extends Interceptor {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401) {
+      await _notifyUnauthorized();
+    }
+    handler.next(err);
+  }
+
+  static Future<void> _notifyUnauthorized() async {
+    if (_handlingUnauthorized) return;
+    final cb = onUnauthorized;
+    if (cb == null) return;
+    _handlingUnauthorized = true;
+    try {
+      await cb();
+    } finally {
+      _handlingUnauthorized = false;
+    }
   }
 }
