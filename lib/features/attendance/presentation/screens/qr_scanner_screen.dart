@@ -32,24 +32,24 @@ class QrScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
-  static bool get _isPhoneNative =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android);
+  /// Téléphone (natif ou Safari/Chrome mobile) → caméra arrière pour le QR.
+  static bool get _isMobilePlatform =>
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android;
 
   late final MobileScannerController _controller = MobileScannerController(
-    // Sur web / PC : pas de caméra arrière → démarrage manuel + facing adapté.
     autoStart: false,
-    // Analyse chaque frame sans délai entre détections.
     detectionSpeed: DetectionSpeed.unrestricted,
-    // Pointage QR : toujours la caméra arrière sur téléphone (iPhone inclus).
-    facing: _isPhoneNative ? CameraFacing.back : CameraFacing.front,
+    // Pointage QR : caméra arrière sur iPhone/Android (y compris PWA web).
+    facing: _isMobilePlatform ? CameraFacing.back : CameraFacing.front,
     torchEnabled: false,
     formats: const [BarcodeFormat.qrCode],
-    // Meilleure netteté QR (Android sinon ~640×480).
-    cameraResolution: _isPhoneNative ? const Size(1280, 720) : null,
-    // Sélecteur expérimental Android uniquement (sur iOS il peut ouvrir la frontale).
-    useNewCameraSelector: defaultTargetPlatform == TargetPlatform.android,
+    cameraResolution: _isMobilePlatform && !kIsWeb
+        ? const Size(1280, 720)
+        : null,
+    // Sélecteur expérimental Android natif uniquement.
+    useNewCameraSelector:
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
     returnImage: false,
   );
 
@@ -76,15 +76,16 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     super.dispose();
   }
 
-  /// Sur téléphone, refusece la caméra arrière si iOS a ouvert la frontale.
+  /// Force la camera arriere (iPhone Safari ouvre souvent la frontale d abord).
   Future<void> _ensureBackCamera() async {
-    if (!_isPhoneNative) return;
-    for (var i = 0; i < 2; i++) {
+    if (!_isMobilePlatform) return;
+    for (var i = 0; i < 3; i++) {
       if (_controller.value.cameraDirection == CameraFacing.back) {
         return;
       }
       try {
         await _controller.switchCamera();
+        await Future<void>.delayed(const Duration(milliseconds: 250));
       } catch (_) {
         break;
       }
@@ -113,13 +114,15 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         await _controller.stop();
       } catch (_) {}
 
-      if (_isPhoneNative) {
-        // iPhone / Android : caméra arrière uniquement (pas de secours frontale).
+      if (_isMobilePlatform) {
+        // iPhone / Android (natif + PWA) : arrière d’abord.
         try {
           await _controller.start(cameraDirection: CameraFacing.back);
         } catch (_) {
           await _controller.start();
         }
+        await _ensureBackCamera();
+        await Future<void>.delayed(const Duration(milliseconds: 400));
         await _ensureBackCamera();
       } else {
         // PC / navigateur : webcam frontale, puis secours.
@@ -141,6 +144,16 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         });
       }
     }
+  }
+
+  Future<void> _flipToBackCamera() async {
+    if (!_isMobilePlatform) return;
+    try {
+      if (_controller.value.cameraDirection != CameraFacing.back) {
+        await _controller.switchCamera();
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _openSitePicker() async {
@@ -341,7 +354,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   Future<void> _resumeScanner() async {
     if (!mounted || _starting) return;
     try {
-      if (_isPhoneNative) {
+      if (_isMobilePlatform) {
         try {
           await _controller.start(cameraDirection: CameraFacing.back);
         } catch (_) {
@@ -468,6 +481,19 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                       icon: const Icon(Icons.arrow_back),
                     ),
                     const Spacer(),
+                    if (_isMobilePlatform)
+                      IconButton.filledTonal(
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white24,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _validating
+                            ? null
+                            : () => unawaited(_flipToBackCamera()),
+                        icon: const Icon(Icons.cameraswitch_rounded),
+                        tooltip: 'Camera arriere',
+                      ),
+                    if (_isMobilePlatform) const SizedBox(width: 8),
                     IconButton.filledTonal(
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.white24,
@@ -499,7 +525,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                     children: [
                       Text(
                         kIsWeb
-                            ? 'Autorisez la webcam, puis placez le QR devant'
+                            ? 'Placez le QR devant la camera arriere'
                             : 'Placez le QR code dans le cadre',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
