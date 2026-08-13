@@ -176,6 +176,21 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
               .where((t) => t['value']?.toString() != 'regularisation')
               .toList()
           : <Map<String, dynamic>>[];
+      // Toujours fusionner le fallback : si l’API prod n’est pas encore à jour
+      // (ex. Allaitement manquant), le type reste visible dans l’app.
+      final merged = <Map<String, dynamic>>[
+        ...List<Map<String, dynamic>>.from(_fallbackTypes),
+      ];
+      for (final t in parsedTypes) {
+        final value = t['value']?.toString();
+        if (value == null || value.isEmpty) continue;
+        final idx = merged.indexWhere((e) => e['value']?.toString() == value);
+        if (idx >= 0) {
+          merged[idx] = t;
+        } else {
+          merged.add(t);
+        }
+      }
       setState(() {
         _items = data is List
             ? data
@@ -183,9 +198,7 @@ class _DeclarationsScreenState extends ConsumerState<DeclarationsScreen> {
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList()
             : [];
-        _types = parsedTypes.isNotEmpty
-            ? parsedTypes
-            : List<Map<String, dynamic>>.from(_fallbackTypes);
+        _types = merged;
       });
     } catch (e) {
       setState(() {
