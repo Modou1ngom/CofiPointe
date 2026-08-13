@@ -127,8 +127,8 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
         ? 'Enrôlement facial'
         : 'Validation faciale';
     final hint = widget.mode == FaceCaptureMode.enroll
-        ? 'Placez votre visage dans le cadre, regard droit, bonne lumière, puis capturez.'
-        : 'Placez votre visage dans le cadre pour valider le pointage.';
+        ? 'Visage de face, yeux ouverts, bonne lumière. Évitez lunettes trop réfléchissantes.'
+        : 'Même conditions qu’à l’enrôlement : face, lumière, yeux ouverts.';
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),

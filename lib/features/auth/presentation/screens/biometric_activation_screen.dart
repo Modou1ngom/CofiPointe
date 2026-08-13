@@ -9,6 +9,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../providers/app_providers.dart';
 import '../../../../services/biometric_service.dart';
+import '../../../../services/face_recognition_service.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 import '../../../../widgets/feedback/app_toast.dart';
@@ -34,25 +35,39 @@ class _BiometricActivationScreenState
 
   Future<void> _activate() async {
     if (_loading) return;
+    if (kIsWeb && _choice == _BioChoice.face) {
+      showAppToast(
+        context,
+        'Sur iPhone (Safari), la reconnaissance faciale n’est pas disponible. '
+        'Choisissez Empreinte, ou installez l’APK Android.',
+        type: ToastType.error,
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final storage = ref.read(secureStorageServiceProvider);
       final face = ref.read(faceRecognitionServiceProvider);
 
       if (_choice == _BioChoice.face) {
-        if (kIsWeb) {
-          throw const BiometricFailure(
-            'La reconnaissance faciale custom n’est pas disponible sur le web. '
-            'Utilisez l’application Android ou iOS.',
+        final samples = <List<double>>[];
+        for (var i = 0; i < FaceRecognitionService.enrollSampleCount; i++) {
+          if (!mounted) return;
+          showAppToast(
+            context,
+            'Capture ${i + 1}/${FaceRecognitionService.enrollSampleCount} — '
+            'visage de face, bonne lumière',
+            type: ToastType.info,
           );
+          final path = await context.push<String>(
+            FaceCaptureScreen.routePathEnroll,
+          );
+          if (path == null || path.isEmpty) {
+            return;
+          }
+          samples.add(await face.extractEmbeddingFromFile(path));
         }
-        final path = await context.push<String>(
-          FaceCaptureScreen.routePathEnroll,
-        );
-        if (path == null || path.isEmpty) {
-          return;
-        }
-        await face.enrollFromFile(path);
+        await face.enrollEmbeddings(samples);
         await storage.writeBiometricMode('face_custom');
       } else {
         final bio = ref.read(biometricServiceProvider);
@@ -107,6 +122,7 @@ class _BiometricActivationScreenState
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final faceAvailable = !kIsWeb;
 
     Widget card({
       required _BioChoice value,
@@ -114,88 +130,103 @@ class _BiometricActivationScreenState
       required String subtitle,
       required IconData icon,
       String? badge,
+      bool enabled = true,
     }) {
-      final selected = _choice == value;
-      return AnimatedContainer(
-        duration: 200.ms,
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-            width: selected ? 2 : 1,
-          ),
-          color: selected
-              ? scheme.primary.withValues(alpha: 0.06)
-              : scheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+      final selected = enabled && _choice == value;
+      return Opacity(
+        opacity: enabled ? 1 : 0.55,
+        child: AnimatedContainer(
+          duration: 200.ms,
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
             ),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-          onTap: () => setState(() => _choice = value),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Icon(icon, size: 36, color: scheme.primary),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                          if (badge != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+            color: selected
+                ? scheme.primary.withValues(alpha: 0.06)
+                : scheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            onTap: enabled ? () => setState(() => _choice = value) : null,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Icon(icon, size: 36, color: scheme.primary),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
                               child: Text(
-                                badge,
+                                title,
                                 style: const TextStyle(
-                                  color: AppColors.success,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+                            if (badge != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: enabled
+                                      ? AppColors.success.withValues(alpha: 0.15)
+                                      : scheme.outlineVariant.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  badge,
+                                  style: TextStyle(
+                                    color: enabled
+                                        ? AppColors.success
+                                        : scheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(
-                  selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: selected ? scheme.primary : scheme.outline,
-                ),
-              ],
+                  Icon(
+                    !enabled
+                        ? Icons.block
+                        : selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                    color: selected ? scheme.primary : scheme.outline,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -210,7 +241,10 @@ class _BiometricActivationScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Choisissez la méthode recommandée pour sécuriser vos pointages.',
+              kIsWeb
+                  ? 'Sur iPhone (web), utilisez l’empreinte. '
+                      'La reconnaissance faciale photo nécessite l’APK Android.'
+                  : 'Choisissez la méthode pour sécuriser vos pointages.',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -227,14 +261,17 @@ class _BiometricActivationScreenState
             card(
               value: _BioChoice.face,
               title: 'Reconnaissance faciale',
-              subtitle:
-                  'Caméra + analyse du visage (ML Kit). Fonctionne hors Face ID.',
+              subtitle: faceAvailable
+                  ? '3 photos (Android). Un autre visage sera refusé.'
+                  : 'Indisponible sur iPhone/Safari — installez l’APK Android.',
               icon: Icons.face_retouching_natural,
+              badge: faceAvailable ? null : 'APK uniquement',
+              enabled: faceAvailable,
             ),
             const Spacer(),
             PrimaryButton(
-              label: _choice == _BioChoice.face
-                  ? 'Enregistrer mon visage'
+              label: _choice == _BioChoice.face && faceAvailable
+                  ? 'Enregistrer mon visage (3 photos)'
                   : 'Activer maintenant',
               loading: _loading,
               onPressed: _activate,

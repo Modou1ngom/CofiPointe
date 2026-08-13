@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,6 +14,7 @@ import '../../../../services/device_info_service.dart';
 import '../../../../services/session_controller.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 import '../../../../widgets/buttons/primary_button.dart';
+import '../../../../widgets/inputs/otp_code_input.dart';
 
 /// Agence virtuelle : saisie e-mail → OTP reçu par e-mail → validation du pointage.
 class MatriculeValidateScreen extends ConsumerStatefulWidget {
@@ -30,41 +30,17 @@ class MatriculeValidateScreen extends ConsumerStatefulWidget {
 class _MatriculeValidateScreenState
     extends ConsumerState<MatriculeValidateScreen> {
   final _emailController = TextEditingController();
-  final _otpNodes = List.generate(6, (_) => FocusNode());
-  final _otpControllers = List.generate(6, (_) => TextEditingController());
+  final _otpKey = GlobalKey<OtpCodeInputState>();
 
   bool _busy = false;
   bool _otpSent = false;
   String? _confirmedEmail;
+  String _otpCode = '';
 
   @override
   void dispose() {
     _emailController.dispose();
-    for (final n in _otpNodes) {
-      n.dispose();
-    }
-    for (final c in _otpControllers) {
-      c.dispose();
-    }
     super.dispose();
-  }
-
-  String get _otpCode => _otpControllers.map((c) => c.text).join();
-
-  void _applyOtpDigits(String raw, {int startIndex = 0}) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return;
-
-    for (var j = 0; j < 6; j++) {
-      final idx = startIndex + j;
-      if (idx >= 6) break;
-      _otpControllers[idx].text = j < digits.length ? digits[j] : '';
-    }
-
-    final filled = _otpCode.length.clamp(0, 6);
-    final focusIndex = filled >= 6 ? 5 : filled;
-    _otpNodes[focusIndex].requestFocus();
-    setState(() {});
   }
 
   Future<void> _requestOtp() async {
@@ -122,7 +98,10 @@ class _MatriculeValidateScreenState
         res.message ?? 'Code OTP envoyé sur votre e-mail.',
         type: ToastType.success,
       );
-      _otpNodes.first.requestFocus();
+      setState(() => _otpCode = '');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _otpKey.currentState?.clear();
+      });
     } on Failure catch (e) {
       if (mounted) {
         showAppToast(context, e.message, type: ToastType.error);
@@ -299,44 +278,20 @@ class _MatriculeValidateScreenState
                   onPressed: _busy ? null : _requestOtp,
                 ),
               ] else ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (i) {
-                    return SizedBox(
-                      width: 44,
-                      child: TextField(
-                        controller: _otpControllers[i],
-                        focusNode: _otpNodes[i],
-                        autofocus: i == 0,
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        maxLength: 1,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (v) {
-                          if (v.length > 1) {
-                            _applyOtpDigits(v, startIndex: i);
-                            return;
-                          }
-                          if (v.isNotEmpty && i < 5) {
-                            _otpNodes[i + 1].requestFocus();
-                          }
-                          if (v.isEmpty && i > 0) {
-                            _otpNodes[i - 1].requestFocus();
-                          }
-                          setState(() {});
-                          if (_otpCode.length == 6 && !_busy) {
-                            _submitPunch();
-                          }
-                        },
+                OtpCodeInput(
+                  key: _otpKey,
+                  enabled: !_busy,
+                  onChanged: (c) => setState(() => _otpCode = c),
+                  onCompleted: (_) {
+                    if (!_busy) _submitPunch();
+                  },
+                ),
+                Text(
+                  'Chiffres visibles. Collez le code ou utilisez la suggestion '
+                  'si l’e-mail est ouvert sur ce téléphone.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: secondary,
                       ),
-                    );
-                  }),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextButton(
@@ -345,10 +300,9 @@ class _MatriculeValidateScreenState
                       : () {
                           setState(() {
                             _otpSent = false;
-                            for (final c in _otpControllers) {
-                              c.clear();
-                            }
+                            _otpCode = '';
                           });
+                          _otpKey.currentState?.clear();
                         },
                   child: const Text('Modifier l’e-mail'),
                 ),

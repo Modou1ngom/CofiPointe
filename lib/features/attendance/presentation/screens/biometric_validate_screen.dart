@@ -54,7 +54,8 @@ class _BiometricValidateScreenState
     if (mode == 'face_custom') {
       if (kIsWeb) {
         throw const BiometricFailure(
-          'La reconnaissance faciale custom n’est pas disponible sur le web.',
+          'Sur iPhone/web, la photo faciale n’est pas disponible. '
+          'Réactivez l’empreinte dans Profil, ou utilisez l’APK Android.',
         );
       }
       if (!await face.hasEnrolledFace()) {
@@ -65,6 +66,9 @@ class _BiometricValidateScreenState
       final path = await context.push<String>(
         FaceCaptureScreen.routePathVerify,
       );
+      if (!mounted) {
+        throw const BiometricFailure('Validation faciale annulée');
+      }
       if (path == null || path.isEmpty) {
         throw const BiometricFailure('Validation faciale annulée');
       }

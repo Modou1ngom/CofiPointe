@@ -1,7 +1,7 @@
 name: cofi_pointe
 description: CofiPointe — Pointage biométrique entreprise (Clean Architecture).
 publish_to: "none"
-version: 1.0.17+18
+version: 1.0.18+19
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -40,6 +40,7 @@ dependencies:
   path: ^1.9.0
   image_picker: ^1.1.2
   file_picker: ^8.1.7
+  image: 4.8.0
 
 dev_dependencies:
   flutter_test:
