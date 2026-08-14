@@ -28,20 +28,58 @@ class FaceCaptureScreen extends StatefulWidget {
   State<FaceCaptureScreen> createState() => _FaceCaptureScreenState();
 }
 
-class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
+class _FaceCaptureScreenState extends State<FaceCaptureScreen>
+    with WidgetsBindingObserver {
   CameraController? _controller;
   bool _ready = false;
   bool _busy = false;
   bool _isFront = true;
+  bool _initializing = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _initCamera();
+    WidgetsBinding.instance.addObserver(this);
+    // Attendre la 1re frame : évite le crash CameraX
+    // « flutterSurfaceProducer … has not yet been initialized ».
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initCamera();
+    });
   }
 
-  Future<void> _initCamera() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _disposeController();
+      if (mounted) setState(() => _ready = false);
+    } else if (state == AppLifecycleState.resumed) {
+      _initCamera();
+    }
+  }
+
+  Future<void> _disposeController() async {
+    final c = _controller;
+    _controller = null;
+    if (c != null) {
+      try {
+        await c.dispose();
+      } catch (_) {}
+    }
+  }
+
+  bool _isSurfaceRaceError(Object e) {
+    final s = e.toString();
+    return s.contains('flutterSurfaceProducer') ||
+        s.contains('surfaceProducerHandlesCropAndRotation') ||
+        s.contains('releaseFlutterSurfaceTexture');
+  }
+
+  Future<void> _initCamera({int attempt = 0}) async {
+    if (!mounted || _initializing) return;
     if (kIsWeb) {
       setState(() {
         _error = 'Caméra / reconnaissance faciale indisponible sur le web.';
@@ -49,42 +87,88 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
       return;
     }
 
-    final camStatus = await Permission.camera.request();
-    if (!camStatus.isGranted) {
-      setState(() {
-        _error = 'Autorisez l’accès à la caméra pour continuer.';
-      });
-      return;
-    }
+    setState(() {
+      _initializing = true;
+      _error = null;
+      _ready = false;
+    });
 
     try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        setState(() => _error = 'Aucune caméra disponible.');
+      final camStatus = await Permission.camera.request();
+      if (!camStatus.isGranted) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Autorisez l’accès à la caméra pour continuer.';
+          _initializing = false;
+        });
         return;
       }
+
+      await _disposeController();
+
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Aucune caméra disponible.';
+          _initializing = false;
+        });
+        return;
+      }
+
       final front = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
       );
+
+      // medium = plus stable que high sur certains Android (CameraX).
       final controller = CameraController(
         front,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
+
       await controller.initialize();
       if (!mounted) {
         await controller.dispose();
         return;
       }
+
+      // Laisser le SurfaceProducer s’attacher avant CameraPreview.
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
       setState(() {
         _controller = controller;
         _isFront = front.lensDirection == CameraLensDirection.front;
         _ready = true;
+        _error = null;
+        _initializing = false;
       });
     } catch (e) {
-      setState(() => _error = 'Impossible d’ouvrir la caméra : $e');
+      await _disposeController();
+      if (!mounted) return;
+
+      if (_isSurfaceRaceError(e) && attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 250 * (attempt + 1)));
+        if (!mounted) return;
+        setState(() => _initializing = false);
+        await _initCamera(attempt: attempt + 1);
+        return;
+      }
+
+      setState(() {
+        _initializing = false;
+        _error = _isSurfaceRaceError(e)
+            ? 'La caméra n’a pas pu démarrer (conflit Android). '
+                'Appuyez sur Réessayer, ou quittez puis rouvrez l’écran.'
+            : 'Impossible d’ouvrir la caméra. Vérifiez les permissions '
+                'et qu’aucune autre app n’utilise la caméra.';
+      });
     }
   }
 
@@ -117,7 +201,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    final c = _controller;
+    _controller = null;
+    c?.dispose();
     super.dispose();
   }
 
@@ -153,10 +240,27 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                         ? Center(
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.lg),
-                              child: Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  TextButton.icon(
+                                    onPressed: _initializing
+                                        ? null
+                                        : () => _initCamera(),
+                                    icon: const Icon(Icons.refresh,
+                                        color: Colors.white),
+                                    label: const Text(
+                                      'Réessayer',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           )
@@ -179,7 +283,8 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                                       width: 240,
                                       height: 300,
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(140),
+                                        borderRadius:
+                                            BorderRadius.circular(140),
                                         border: Border.all(
                                           color: AppColors.primary,
                                           width: 3,
@@ -198,7 +303,8 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                     ? 'Enregistrer mon visage'
                     : 'Valider mon visage',
                 loading: _busy,
-                onPressed: (!_ready || _error != null || _busy) ? null : _capture,
+                onPressed:
+                    (!_ready || _error != null || _busy) ? null : _capture,
               ),
               TextButton(
                 onPressed: _busy ? null : () => context.pop(),
