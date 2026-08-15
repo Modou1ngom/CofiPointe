@@ -63,16 +63,16 @@ class _BiometricValidateScreenState
           'Aucun visage enrôlé. Allez dans Profil pour activer la reconnaissance faciale.',
         );
       }
-      final path = await context.push<String>(
+      final paths = await context.push<List<String>>(
         FaceCaptureScreen.routePathVerify,
       );
       if (!mounted) {
         throw const BiometricFailure('Validation faciale annulée');
       }
-      if (path == null || path.isEmpty) {
+      if (paths == null || paths.isEmpty) {
         throw const BiometricFailure('Validation faciale annulée');
       }
-      return face.verifyFromFile(path);
+      return face.verifyFromFile(paths.first);
     }
 
     final bio = ref.read(biometricServiceProvider);

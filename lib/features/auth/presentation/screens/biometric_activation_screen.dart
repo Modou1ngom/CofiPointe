@@ -50,21 +50,15 @@ class _BiometricActivationScreenState
       final face = ref.read(faceRecognitionServiceProvider);
 
       if (_choice == _BioChoice.face) {
+        final paths = await context.push<List<String>>(
+          FaceCaptureScreen.routePathEnroll,
+        );
+        if (paths == null ||
+            paths.length < FaceRecognitionService.enrollSampleCount) {
+          return;
+        }
         final samples = <List<double>>[];
-        for (var i = 0; i < FaceRecognitionService.enrollSampleCount; i++) {
-          if (!mounted) return;
-          showAppToast(
-            context,
-            'Capture ${i + 1}/${FaceRecognitionService.enrollSampleCount} — '
-            'visage de face, bonne lumière',
-            type: ToastType.info,
-          );
-          final path = await context.push<String>(
-            FaceCaptureScreen.routePathEnroll,
-          );
-          if (path == null || path.isEmpty) {
-            return;
-          }
+        for (final path in paths) {
           samples.add(await face.extractEmbeddingFromFile(path));
         }
         await face.enrollEmbeddings(samples);

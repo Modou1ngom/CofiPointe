@@ -7,12 +7,17 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../services/face_recognition_service.dart';
 import '../../../../widgets/buttons/primary_button.dart';
 import '../../../../widgets/feedback/app_toast.dart';
 
 enum FaceCaptureMode { enroll, verify }
 
-/// Capture caméra avant + retourne le chemin du fichier photo.
+/// Capture caméra avant. Retourne la liste des chemins de photos.
+///
+/// L'enrôlement prend plusieurs clichés dans la **même session caméra** :
+/// rouvrir la caméra entre chaque photo provoquait un aperçu noir sur Android
+/// (Surface CameraX invalidée alors que le contrôleur se dit initialisé).
 class FaceCaptureScreen extends StatefulWidget {
   const FaceCaptureScreen({
     super.key,
@@ -36,6 +41,14 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
   bool _isFront = true;
   bool _initializing = false;
   String? _error;
+
+  final List<String> _shots = [];
+
+  int get _shotCount => widget.mode == FaceCaptureMode.enroll
+      ? FaceRecognitionService.enrollSampleCount
+      : 1;
+
+  bool get _isEnroll => widget.mode == FaceCaptureMode.enroll;
 
   @override
   void initState() {
@@ -181,7 +194,21 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
     try {
       final file = await controller.takePicture();
       if (!mounted) return;
-      context.pop<String>(file.path);
+
+      _shots.add(file.path);
+
+      if (_shots.length >= _shotCount) {
+        context.pop<List<String>>(List<String>.unmodifiable(_shots));
+        return;
+      }
+
+      setState(() {});
+      showAppToast(
+        context,
+        'Photo ${_shots.length}/$_shotCount enregistrée — '
+        'changez légèrement d’angle pour la suivante',
+        type: ToastType.success,
+      );
     } on Failure catch (e) {
       if (mounted) {
         showAppToast(context, e.message, type: ToastType.error);
@@ -199,6 +226,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
     }
   }
 
+  void _resetShots() {
+    setState(_shots.clear);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -208,12 +239,16 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
     super.dispose();
   }
 
+  String get _buttonLabel {
+    if (!_isEnroll) return 'Valider mon visage';
+    final next = _shots.length + 1;
+    return 'Prendre la photo $next/$_shotCount';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = widget.mode == FaceCaptureMode.enroll
-        ? 'Enrôlement facial'
-        : 'Validation faciale';
-    final hint = widget.mode == FaceCaptureMode.enroll
+    final title = _isEnroll ? 'Enrôlement facial' : 'Validation faciale';
+    final hint = _isEnroll
         ? 'Visage de face, yeux ouverts, bonne lumière. Évitez lunettes trop réfléchissantes.'
         : 'Même conditions qu’à l’enrôlement : face, lumière, yeux ouverts.';
 
@@ -230,6 +265,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (_isEnroll) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _ShotProgress(done: _shots.length, total: _shotCount),
+              ],
               const SizedBox(height: AppSpacing.md),
               Expanded(
                 child: ClipRRect(
@@ -299,13 +338,16 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
               ),
               const SizedBox(height: AppSpacing.lg),
               PrimaryButton(
-                label: widget.mode == FaceCaptureMode.enroll
-                    ? 'Enregistrer mon visage'
-                    : 'Valider mon visage',
+                label: _buttonLabel,
                 loading: _busy,
                 onPressed:
                     (!_ready || _error != null || _busy) ? null : _capture,
               ),
+              if (_isEnroll && _shots.isNotEmpty)
+                TextButton(
+                  onPressed: _busy ? null : _resetShots,
+                  child: const Text('Recommencer les photos'),
+                ),
               TextButton(
                 onPressed: _busy ? null : () => context.pop(),
                 child: const Text('Annuler'),
@@ -314,6 +356,33 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ShotProgress extends StatelessWidget {
+  const _ShotProgress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(total, (i) {
+        final filled = i < done;
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: 34,
+          height: 6,
+          decoration: BoxDecoration(
+            color: filled ? AppColors.primary : scheme.outlineVariant,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+      }),
     );
   }
 }
